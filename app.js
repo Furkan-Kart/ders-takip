@@ -141,6 +141,7 @@ function isKarti(is, bugunMu) {
 function durumKarti(p) {
   const o = p.ozet || {};
   if (p.hata) return `<div class="kart kucuk soluk">Program şu an hesaplanamadı. Verilerin güvende; sayfayı yenilemeyi dene.</div>`;
+  const oneri = (p.oneriler || []).slice(0, 3);
   let sinif = 'rahat', baslik = 'Program yolunda', aciklama = '';
   if (!p.sinav) { baslik = 'Sınav tarihi yok'; sinif = 'sinirda'; aciklama = 'Program şimdilik 14 günlük hazırlanıyor. Sınavı Dersler sekmesinden eklersen ona göre ayarlanır.'; }
   else if (p.yetismeyen.length || o.yetisme === 'yetismiyor') {
@@ -150,9 +151,8 @@ function durumKarti(p) {
   else if (o.tahminiBitis) aciklama = `Yeni konular bu tempoyla ${tarihYaz(o.tahminiBitis, 'gun')} günü bitiyor.`;
   else if (o.toplamKalanDk === 0) aciklama = 'Tüm konular çalışıldı, geriye tekrarlar kaldı.';
   else aciklama = 'Tüm konular sınavdan önce bitiyor.';
-  const oneri = (p.oneriler || []).slice(0, 3);
   return `<div class="kart"><div class="durumk ${sinif}"><span class="isaret"></span><div><b>${esc(baslik)}</b>
-    <div class="soluk kucuk">${esc(aciklama)}</div></div></div>
+    ${oneri.length && sinif === 'yetismiyor' ? '' : `<div class="soluk kucuk">${esc(aciklama)}</div>`}</div></div>
     ${oneri.length ? `<ul class="oneri">${oneri.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
 }
 
@@ -398,9 +398,9 @@ function gorOzet() {
   for (const d of dersler) {
     const ks = dersKonulari(d.id), b = ks.filter(k => k.durum === 'calisildi').length;
     h += `<div class="yatay"><span class="ad">${esc(d.ad)}</span><div class="cubuk"><i style="width:${ks.length ? b / ks.length * 100 : 0}%;background:${esc(d.renk)}"></i></div>
-      <span class="soluk sayi">${b}/${ks.length}</span></div>`;
+      <span class="soluk sayi">${b}/${ks.length} · %${Algo.dersOzet(S, d.id, t).hazirlik ?? 0}</span></div>`;
   }
-  return h + `</div></div></div>`;
+  return h + `<p class="soluk kucuk" style="margin-top:12px">Yüzdeler, konuları bugün ne kadar hatırladığına dair tahmindir.</p></div></div></div>`;
 }
 
 function gorAyarlar() {
@@ -414,7 +414,7 @@ function gorAyarlar() {
     <div class="gunler">${GUN_KISA.map((g, i) => `<div><label for="g${i}">${g}</label>
       <input id="g${i}" type="number" inputmode="numeric" min="0" max="900" step="5" value="${a.gunluk[i]}" data-d="gunluk" data-i="${i}"></div>`).join('')}</div></div>
   <div class="kart"><b>Tekrar ve sınav</b>
-    <label for="ar">Temel tekrar aralıkları (gün, virgülle ayır)</label>
+    <label for="ar">Tekrar sıklığı tercihi (gün). 1, 7, 30 normal tempodur; daha küçük sayılar daha sık, daha büyükler daha seyrek tekrar demek.</label>
     <input id="ar" type="text" inputmode="numeric" value="${a.araliklar.join(', ')}" data-d="araliklar">
     <label for="tg">Sınavdan önce genel tekrara ayrılacak gün sayısı</label>
     <input id="tg" type="number" inputmode="numeric" min="0" max="14" value="${a.tekrarGunu}" data-d="tekrarGunu"></div>
@@ -428,7 +428,7 @@ function gorAyarlar() {
     <p class="soluk kucuk">Android (Chrome): menü › "Ana ekrana ekle" ya da "Uygulamayı yükle". iPhone ve iPad (Safari): Paylaş › "Ana Ekrana Ekle".
     Kurulduktan sonra internet olmadan da açılır.</p></div>
   <div class="kart"><button class="btn tehlike" data-a="sifirla">Tüm verileri sil</button></div>
-  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 1.1</p></div></div>`;
+  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 1.2</p></div></div>`;
 }
 
 const GORUNUM = { bugun: gorBugun, dersler: gorDersler, sure: gorSure, ozet: gorOzet, ayarlar: gorAyarlar };
