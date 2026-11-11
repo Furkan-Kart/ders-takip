@@ -163,7 +163,6 @@ function soruOzet(f) {
   const top = d + y + b;
   return { d, y, b, top, oran: top ? Math.round(d / top * 100) : null };
 }
-const netYaz = (d, y) => (d - y / 4).toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
 const dybCubuk = o => `<div class="dyb" role="img" aria-label="${o.d} doğru, ${o.y} yanlış, ${o.b} boş">
   <i style="flex:${o.d}"></i><i class="y" style="flex:${o.y}"></i><i class="b" style="flex:${o.b}"></i></div>`;
 const guvenliUrl = u => /^https?:\/\/\S+$/i.test(u || '') ? u : '';
@@ -390,7 +389,7 @@ function gorDers(d) {
   const so = soruOzet(q => q.dersId === d.id);
   const sonSoru = S.sorular.filter(q => q.dersId === d.id).sort((a, b) => a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : b.id < a.id ? -1 : 1).slice(0, 4);
   h += `<div class="kart"><div class="bas"><div><b>Soru çözümü</b><div class="soluk kucuk sayi">${so.top
-    ? `${so.top} soru · %${so.oran} doğru · ${netYaz(so.d, so.y)} net` : 'Çözdüğün soruları kaydet; zayıf çıkan konuların tekrarı öne alınır.'}</div></div>
+    ? `${so.top} soru · ${so.d} doğru · %${so.oran}` : 'Çözdüğün soruları kaydet; zayıf çıkan konuların tekrarı öne alınır.'}</div></div>
     <button class="btn kucuk ghost" data-a="soruEkle" data-id="${d.id}">${ik('arti')} Soru</button></div>${so.top ? dybCubuk(so) : ''}
     ${sonSoru.length ? `<ul class="liste sorul">${sonSoru.map(q => { const k = konuBul(q.konuId), tp = q.dogru + q.yanlis + (q.bos || 0);
       return `<li><div class="orta"><div class="ad">${esc(k ? k.ad : 'Genel')}</div><div class="soluk kucuk sayi">${tarihYaz(q.tarih, 'gun')} · ${q.dogru} doğru, ${q.yanlis} yanlış${q.bos ? `, ${q.bos} boş` : ''}</div></div>
@@ -561,7 +560,7 @@ function gorOzet() {
       <span class="sayi"><b>${sureYaz(dk)}</b> <span class="soluk">%${Math.round(dk / toplam * 100)}</span></span></div>`;
   }
   const sw = soruOzet(q => q.tarih >= bas && q.tarih <= son);
-  h += `</div><div class="kart"><div class="bas"><b>Sorular</b>${sw.top ? `<span class="soluk kucuk sayi">${sw.top} soru · ${netYaz(sw.d, sw.y)} net</span>` : ''}</div>`;
+  h += `</div><div class="kart"><div class="bas"><b>Sorular</b>${sw.top ? `<span class="soluk kucuk sayi">${sw.top} soru · ${sw.d} doğru · %${sw.oran}</span>` : ''}</div>`;
   if (!sw.top) h += `<div class="soluk" style="text-align:center;padding:18px 0 6px">Bu hafta soru kaydı yok.</div>`;
   else {
     h += dybCubuk(sw);
@@ -637,7 +636,7 @@ function gorAyarlar() {
     <p class="soluk kucuk">Android (Chrome): menü › "Ana ekrana ekle" ya da "Uygulamayı yükle". iPhone ve iPad (Safari): Paylaş › "Ana Ekrana Ekle".
     Kurulduktan sonra internet olmadan da açılır.</p></div>
   <div class="kart"><button class="btn tehlike blok" data-a="sifirla">Tüm verileri sil</button></div>
-  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 2.2</p></div></div>`;
+  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 2.2.1</p></div></div>`;
 }
 
 const GORUNUM = { bugun: gorBugun, dersler: gorDersler, sure: gorSure, ozet: gorOzet, ayarlar: gorAyarlar };
