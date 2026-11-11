@@ -41,18 +41,34 @@ const IK = {
   oynat: '<path d="M8 5.5v13l11-6.5z"/>',
   tik: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   arti: '<path d="M12 5v14M5 12h14"/>',
-  uc: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
+  uc: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   geri: '<path d="M15 5l-7 7 7 7"/>',
   ileri: '<path d="M9 5l7 7-7 7"/>',
-  carpi: '<path d="M6 6l12 12M18 6L6 18"/>'
+  carpi: '<path d="M6 6l12 12M18 6L6 18"/>',
+  alev: '<path d="M12 2c1 4 6 6 6 12a6 6 0 0 1-12 0c0-2 1-4 2-5 0 2 1 3 2 3 0-4 0-7 2-10z"/>',
+  ampul: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>',
+  unlem: '<path d="M12 7v6M12 17h.01"/><circle cx="12" cy="12" r="9"/>',
+  takvim: '<path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/>',
+  saat: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  hedef: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/>',
+  kitap: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11"/>',
+  yenile: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
+  gunes: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/>',
+  indir: '<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
+  telefon: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>',
+  yuzZor: '<circle cx="12" cy="12" r="9"/><path d="M8.5 16c1-1.6 6-1.6 7 0M9 10h.01M15 10h.01"/>',
+  yuzOrta: '<circle cx="12" cy="12" r="9"/><path d="M8.5 15.5h7M9 10h.01M15 10h.01"/>',
+  yuzKolay: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 2 6 2 7 0M9 10h.01M15 10h.01"/>'
 };
 const ik = (ad, dolgu) => `<svg class="ik${dolgu ? ' dolgu' : ''}" viewBox="0 0 24 24" aria-hidden="true">${IK[ad]}</svg>`;
-function halka(oran, boy, kalinlik, renk, ic = '', id = '') {
-  const r = (boy - kalinlik) / 2, c = 2 * Math.PI * r, o = Math.min(1, Math.max(0, oran || 0));
+let halkaNo = 0;
+function halka(oran, boy, kalinlik, renk, ic = '', id = '', renk2 = '') {
+  const r = (boy - kalinlik) / 2, c = 2 * Math.PI * r, o = Math.min(1, Math.max(0, oran || 0)), son = c * (1 - o), g = 'hg' + (++halkaNo);
   return `<div class="halka" style="width:${boy}px;height:${boy}px"><svg viewBox="0 0 ${boy} ${boy}">
+    ${renk2 ? `<defs><linearGradient id="${g}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${renk2}"/><stop offset="1" stop-color="${renk}"/></linearGradient></defs>` : ''}
     <circle class="iz" cx="${boy / 2}" cy="${boy / 2}" r="${r}" stroke-width="${kalinlik}"/>
-    <circle class="dolu" ${id ? `id="${id}" data-c="${c}"` : ''} cx="${boy / 2}" cy="${boy / 2}" r="${r}" stroke-width="${kalinlik}" stroke="${renk}"
-      stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - o)}" transform="rotate(-90 ${boy / 2} ${boy / 2})"/></svg>
+    <circle class="dolu" ${id ? `id="${id}" data-c="${c}"` : ''} data-h="${son}" cx="${boy / 2}" cy="${boy / 2}" r="${r}" stroke-width="${kalinlik}"
+      stroke="${renk2 ? `url(#${g})` : renk}" stroke-dasharray="${c}" stroke-dashoffset="${UI.anim ? c : son}" transform="rotate(-90 ${boy / 2} ${boy / 2})"/></svg>
     <div class="ic">${ic}</div></div>`;
 }
 
@@ -90,14 +106,19 @@ function kaydet() {
   try { localStorage.setItem(ANAHTAR, JSON.stringify(S)); }
   catch { toast('Kaydedilemedi: cihazda depolama alanı dolu olabilir.'); }
 }
-const UI = { sekme: 'bugun', dersId: null, hafta: 0, sDers: '', sKonu: '', sHedef: 0, gun: 1, filtre: 'tum' };
+const UI = { anim: true, sekme: 'bugun', dersId: null, hafta: 0, sDers: '', sKonu: '', sHedef: 0, gun: 1, filtre: 'tum' };
 
 const dersBul = id => S.dersler.find(d => d.id === id);
 const konuBul = id => S.konular.find(k => k.id === id);
 const aktifKomite = () => S.komiteler.find(k => k.id === S.aktifKomite);
 const aktifDersler = () => S.dersler.filter(d => d.komiteId === S.aktifKomite);
 const dersKonulari = id => S.konular.filter(k => k.dersId === id);
-const temaUygula = () => { if (S.ayar.tema) document.documentElement.dataset.tema = S.ayar.tema; else delete document.documentElement.dataset.tema; };
+function temaUygula() {
+  const k = document.documentElement;
+  if (S.ayar.tema) k.dataset.tema = S.ayar.tema; else delete k.dataset.tema;
+  const koyu = S.ayar.tema ? S.ayar.tema === 'koyu' : matchMedia('(prefers-color-scheme: dark)').matches;
+  $('meta[name=theme-color]').content = koyu ? '#080c11' : '#f5f4f0';
+}
 
 /* ---------- algoritma köprüsü (asıl mantık algoritma.js içinde) ---------- */
 const tahminDk = k => Algo.tahminDk(S, k);
@@ -125,35 +146,45 @@ function seri() {
 }
 
 /* ---------- görünümler ---------- */
+const kisalt = ad => String(ad || '?').trim().slice(0, 2).toLocaleUpperCase('tr');
+const rozet = d => `<span class="rozet" style="--renk:${esc(d.renk)}" aria-hidden="true">${esc(kisalt(d.ad))}</span>`;
+const resim = () => `<svg class="resim" viewBox="0 0 96 96" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1">
+  <stop offset="0" stop-color="#2dd4bf"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs>
+  <rect x="14" y="20" width="56" height="64" rx="14" fill="url(#rg)" opacity=".22" transform="rotate(-8 42 52)"/>
+  <rect x="22" y="14" width="56" height="66" rx="14" fill="url(#rg)"/>
+  <path d="M34 34h32M34 46h32M34 58h18" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".9"/>
+  <circle cx="74" cy="72" r="14" fill="#fbbf24"/><path d="M68 72l4.5 4.5 8-9" fill="none" stroke="#3b2500" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const bosKart = (baslik, metin, dugme = '') => `<div class="kart bos">${resim()}<b>${baslik}</b><span>${metin}</span>${dugme}</div>`;
+
 function isKarti(is, bugunMu) {
-  const k = is.konu, d = dersBul(k.dersId) || {};
+  const k = is.konu, d = dersBul(k.dersId) || { ad: '?', renk: '#888' };
   const et = is.tip === 'yeni' ? '' :
     is.gecikme ? `<span class="etiket gecikti">${is.gecikme} gün gecikti</span>` :
-    `<span class="etiket">${is.tip === 'genel' ? 'Genel tekrar' : 'Tekrar'}</span>`;
+    `<span class="etiket">${is.tip === 'genel' || is.sinavOncesi ? 'Sınav öncesi tekrar' : 'Tekrar'}</span>`;
   const dugme = !bugunMu ? '' : `<button class="yuv" data-a="calis" data-id="${k.id}" aria-label="Sayaçla çalış" title="Sayaçla çalış">${ik('oynat', 1)}</button>
     <button class="yuv dolu" data-a="${is.tip === 'yeni' ? 'calistim' : 'tekrarEt'}" data-id="${k.id}"
       aria-label="${is.tip === 'yeni' ? 'Çalıştım' : 'Tekrar ettim'}" title="${is.tip === 'yeni' ? 'Çalıştım' : 'Tekrar ettim'}">${ik('tik')}</button>`;
-  return `<li class="is ${bugunMu ? '' : 'kompakt'}" style="--renk:${esc(d.renk)}"><div class="orta"><div class="ad">${esc(k.ad)}</div>
+  return `<li class="is ${bugunMu ? '' : 'kompakt'}">${rozet(d)}<div class="orta"><div class="ad">${esc(k.ad)}</div>
     <div class="meta"><span>${esc(d.ad)} · ${is.dk} dk</span>${et}</div>
-    ${is.neden ? `<div class="neden">${esc(is.neden)}</div>` : ''}</div>${dugme}</li>`;
+    ${is.neden && bugunMu ? `<div class="neden">${esc(is.neden)}</div>` : ''}</div>${dugme}</li>`;
 }
 
 function durumKarti(p) {
   const o = p.ozet || {};
   if (p.hata) return `<div class="kart kucuk soluk">Program şu an hesaplanamadı. Verilerin güvende; sayfayı yenilemeyi dene.</div>`;
   const oneri = (p.oneriler || []).slice(0, 3);
-  let sinif = 'rahat', baslik = 'Program yolunda', aciklama = '';
-  if (!p.sinav) { baslik = 'Sınav tarihi yok'; sinif = 'sinirda'; aciklama = 'Program şimdilik 14 günlük hazırlanıyor. Sınavı Dersler sekmesinden eklersen ona göre ayarlanır.'; }
+  let sinif = 'rahat', simge = 'tik', baslik = 'Program yolunda', aciklama = '';
+  if (!p.sinav) { baslik = 'Sınav tarihi yok'; sinif = 'sinirda'; simge = 'takvim'; aciklama = 'Program şimdilik 14 günlük hazırlanıyor. Sınavı Dersler sekmesinden ekle.'; }
   else if (p.yetismeyen.length || o.yetisme === 'yetismiyor') {
-    sinif = 'yetismiyor'; baslik = `${p.yetismeyen.length} konu sınava yetişmiyor`;
-    aciklama = `Yetişmesi için günde yaklaşık ${p.ekGunluk} dk daha çalışman gerekiyor.`;
-  } else if (o.yetisme === 'sinirda') { sinif = 'sinirda'; baslik = 'Program sınırda'; aciklama = 'Her şey yetişiyor ama boşluk kalmıyor; bir günü kaçırırsan sıkışır.'; }
-  else if (o.tahminiBitis) aciklama = `Yeni konular bu tempoyla ${tarihYaz(o.tahminiBitis, 'gun')} günü bitiyor.`;
+    sinif = 'yetismiyor'; simge = 'unlem'; baslik = `${p.yetismeyen.length} konu sınava yetişmiyor`;
+    aciklama = `Yetişmesi için günde yaklaşık ${p.ekGunluk} dk daha gerekiyor.`;
+  } else if (o.yetisme === 'sinirda') { sinif = 'sinirda'; simge = 'unlem'; baslik = 'Program sınırda'; aciklama = 'Her şey yetişiyor ama boşluk kalmıyor.'; }
+  else if (o.tahminiBitis) aciklama = `Yeni konular ${tarihYaz(o.tahminiBitis, 'gun')} günü bitiyor.`;
   else if (o.toplamKalanDk === 0) aciklama = 'Tüm konular çalışıldı, geriye tekrarlar kaldı.';
   else aciklama = 'Tüm konular sınavdan önce bitiyor.';
-  return `<div class="kart"><div class="durumk ${sinif}"><span class="isaret"></span><div><b>${esc(baslik)}</b>
-    ${oneri.length && sinif === 'yetismiyor' ? '' : `<div class="soluk kucuk">${esc(aciklama)}</div>`}</div></div>
-    ${oneri.length ? `<ul class="oneri">${oneri.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
+  return `<div class="kart"><div class="durumk ${sinif}"><span class="sim">${ik(simge)}</span><div><b>${esc(baslik)}</b>
+    <div class="soluk kucuk">${esc(aciklama)}</div></div></div>
+    ${oneri.length ? `<ul class="oneri">${oneri.map(x => `<li>${ik('ampul')}<span>${esc(x)}</span></li>`).join('')}</ul>` : ''}</div>`;
 }
 
 function gorBugun() {
@@ -165,23 +196,22 @@ function gorBugun() {
   const p = konuVar ? planla() : { gunler: [], yetismeyen: [], ozet: {} };
   const sinavG = p.sinav ? gunFark(t, p.sinav.tarih) : null;
   const sr = seri();
-  let h = `<section class="hero"><div><p class="ust">${tarihYaz(t, 'uzun')}</p><h1>${selam}</h1>
-    <p class="alt">${esc(kom.ad)}</p>
-    ${p.sinav ? `<span class="rozet ${sinavG <= 7 ? 'sari' : ''}">${esc(p.sinav.ad)}: ${sinavG} gün</span>` : ''}</div>
-    ${halka(hedef ? calisilan / hedef : 0, 104, 10, '#fff', `<b class="sayi">${calisilan}</b><span>/ ${hedef} dk</span>`)}</section>`;
-  if (!konuVar) {
-    return h + `<div class="kart bos"><p><b>Henüz ders veya konu yok</b></p>
-      <p>Derslerini ve konularını ekleyince günlük çalışma programın burada otomatik oluşur.</p>
-      <p><button class="btn" data-a="sekme" data-s="dersler">${ik('arti')} Ders ekle</button></p></div>`;
-  }
   const g0 = p.gunler[0] || { isler: [] };
   const kalanDk = g0.isler.reduce((a, i) => a + i.dk, 0);
-  h += `<div class="kutular"><div class="kutu"><b>${sr}</b><span>günlük seri</span></div>
-    <div class="kutu"><b>%${p.ozet.hazirlik ?? 0}</b><span>sınava hazırlık</span></div>
-    <div class="kutu"><b>${sureYaz(kalanDk)}</b><span>bugün kalan iş</span></div></div>`;
-  let sol = `<h2>Bugünün programı</h2>`;
+  let h = `<section class="hero"><div class="ust"><span>${tarihYaz(t, 'uzun')}</span>
+    ${sr ? `<span class="hap sari">${ik('alev', 1)}${sr} gün seri</span>` : ''}</div>
+    <div class="govde"><div><h1>${selam}</h1><p class="alt">${esc(kom.ad)}${p.sinav ? ' · ' + esc(p.sinav.ad) : ''}</p></div>
+    ${halka(hedef ? calisilan / hedef : 0, 116, 11, '#ffffff', `<b class="sayi">${calisilan}</b><span>/ ${hedef} dk</span>`, '', '#5eead4')}</div>
+    ${konuVar ? `<div class="camlar"><div><b>${sinavG === null ? '–' : sinavG + ' gün'}</b><span>sınava kalan</span></div>
+      <div><b>%${p.ozet.hazirlik ?? 0}</b><span>hazırlık</span></div>
+      <div><b>${sureYaz(kalanDk)}</b><span>bugün kalan iş</span></div></div>` : ''}</section>`;
+  if (!konuVar) {
+    return h + bosKart('Henüz ders veya konu yok', 'Derslerini ve konularını ekleyince günlük çalışma programın burada kendiliğinden oluşur.',
+      `<button class="btn parlak" data-a="sekme" data-s="dersler">${ik('arti')} Ders ekle</button>`);
+  }
+  let sol = `<div class="bas bolum"><h2>Bugünün programı</h2>${g0.isler.length ? `<span class="soluk kucuk">${g0.isler.length} iş</span>` : ''}</div>`;
   sol += g0.isler.length ? `<ul class="isler">${g0.isler.map(i => isKarti(i, true)).join('')}</ul>`
-    : `<div class="kart bos"><b>Bugünlük bu kadar</b><br>Planlanan işlerin hepsi tamam.</div>`;
+    : bosKart('Bugünlük bu kadar', 'Planlanan işlerin hepsi tamam. İstersen yarının işlerinden birine başlayabilirsin.');
   let sag = `<h2>Program durumu</h2>${durumKarti(p)}`;
   const sonra = p.gunler.slice(1, 15);
   if (sonra.length) {
@@ -193,10 +223,10 @@ function gorBugun() {
         aria-label="${tarihYaz(x.tarih, 'uzun')}"><small>${GUN_KISA[haftaGunu(x.tarih)]}</small><b>${tarih(x.tarih).getDate()}</b>
         <i><u style="width:${x.hedef ? Math.min(100, yuk / x.hedef * 100) : (yuk ? 100 : 0)}%"></u></i></button>`;
     }).join('')}</div>
-    <div class="kart"><div class="bas"><b>${tarihYaz(g.tarih, 'uzun')}</b>
+    <div class="kart" style="margin-top:0"><div class="bas"><b>${tarihYaz(g.tarih, 'uzun')}</b>
       <span class="soluk kucuk">${g.isler.length ? `${g.isler.length} iş · ${sureYaz(dk)}` : 'boş'}</span></div>
       ${g.rezerv ? `<p class="soluk kucuk">Sınav öncesi genel tekrar günü.</p>` : ''}
-      ${g.isler.length ? `<ul class="isler" style="margin-top:12px">${g.isler.map(i => isKarti(i, false)).join('')}</ul>`
+      ${g.isler.length ? `<ul class="isler" style="margin-top:12px;gap:8px">${g.isler.map(i => isKarti(i, false)).join('')}</ul>`
         : `<p class="soluk kucuk">${g.hedef ? 'Bu güne iş düşmedi.' : 'Bu gün için hedef süre 0.'}</p>`}</div>`;
   }
   const diger = S.sinavlar.filter(s => s.tarih >= t).sort((a, b) => a.tarih < b.tarih ? -1 : 1).slice(0, 4);
@@ -220,29 +250,29 @@ function gorDersler() {
   if (UI.dersId && dersBul(UI.dersId)) return gorDers(dersBul(UI.dersId));
   UI.dersId = null;
   const kid = S.aktifKomite, t = bugun();
-  let h = `<div class="bas"><h1>Dersler</h1><button class="btn kucuk ghost" data-a="komiteDuzenle">Komiteyi düzenle</button></div>
+  let h = `<div class="ustbar"><h1>Dersler</h1><button class="btn kucuk ghost" data-a="komiteDuzenle">Komiteyi düzenle</button></div>
     <div class="cipler">${S.komiteler.map(k =>
     `<button class="cip ${k.id === kid ? 'secili' : ''}" data-a="komiteSec" data-id="${k.id}">${esc(k.ad)}</button>`).join('')}
     <button class="cip cizgili" data-a="komiteEkle">+ Komite</button></div>`;
   const dersler = aktifDersler();
-  h += `<div class="bas"><h2>Dersler</h2><button class="btn kucuk" data-a="dersEkle">${ik('arti')} Ders</button></div>`;
-  if (!dersler.length) h += `<div class="kart bos"><b>Bu komitede henüz ders yok</b><br>Örneğin Anatomi, Fizyoloji, Biyokimya ekleyebilirsin.</div>`;
+  h += `<div class="bas bolum"><h2>Dersler</h2><button class="btn kucuk" data-a="dersEkle">${ik('arti')} Ders</button></div>`;
+  if (!dersler.length) h += bosKart('Bu komitede henüz ders yok', 'Örneğin Anatomi, Fizyoloji, Biyokimya ekleyebilirsin.');
   h += `<div class="izgara">`;
   for (const d of dersler) {
     const ks = dersKonulari(d.id), biten = ks.filter(k => k.durum === 'calisildi').length;
-    const vadeli = ks.filter(k => k.durum === 'calisildi' && k.sonrakiTekrar && k.sonrakiTekrar <= t).length;
-    const oran = ks.length ? biten / ks.length : 0;
-    h += `<button class="kart derskart" data-a="dersAc" data-id="${d.id}">
-      ${halka(oran, 62, 7, esc(d.renk), `<span class="sayi">%${Math.round(oran * 100)}</span>`)}
+    const vade = k => k.durum === 'calisildi' && k.sonrakiTekrar && k.sonrakiTekrar <= t;
+    const vadeli = ks.filter(vade).length, oran = ks.length ? biten / ks.length : 0;
+    h += `<button class="kart derskart" style="--renk:${esc(d.renk)}" data-a="dersAc" data-id="${d.id}">
+      <div class="ustk">${halka(oran, 60, 7, esc(d.renk), `<span class="sayi">%${Math.round(oran * 100)}</span>`)}
       <div class="orta"><div class="ad">${esc(d.ad)}</div>
-      <div class="soluk kucuk">${biten} / ${ks.length} konu · ${zorlukYaz(d.zorluk)}</div>
-      ${vadeli ? `<div style="margin-top:4px"><span class="etiket gecikti">${vadeli} tekrar bekliyor</span></div>` : ''}</div>
-      <span class="soluk">${ik('ileri')}</span></button>`;
+      <div class="soluk kucuk">${biten} / ${ks.length} konu · ${zorlukYaz(d.zorluk)}</div></div>
+      ${vadeli ? `<span class="etiket gecikti">${vadeli} tekrar</span>` : ''}<span class="soluk">${ik('ileri')}</span></div>
+      ${ks.length ? `<div class="noktalar" aria-hidden="true">${ks.slice(0, 60).map(k => `<i class="${vade(k) ? 'v' : k.durum === 'calisildi' ? 't' : ''}"></i>`).join('')}</div>` : ''}</button>`;
   }
   h += `</div>`;
   const sinavlar = S.sinavlar.filter(s => s.komiteId === kid).sort((a, b) => a.tarih < b.tarih ? -1 : 1);
-  h += `<div class="bas"><h2>Sınavlar</h2><button class="btn kucuk" data-a="sinavEkle">${ik('arti')} Sınav</button></div><div class="kart">`;
-  h += sinavlar.length ? sinavListe(sinavlar, true) : `<div class="bos">Sınav tarihini ekle; geri sayım ve program buna göre hazırlanır.</div>`;
+  h += `<div class="bas bolum"><h2>Sınavlar</h2><button class="btn kucuk" data-a="sinavEkle">${ik('arti')} Sınav</button></div><div class="kart">`;
+  h += sinavlar.length ? sinavListe(sinavlar, true) : `<div class="soluk" style="text-align:center;padding:10px">Sınav tarihini ekle; geri sayım ve program buna göre hazırlanır.</div>`;
   return h + `</div>`;
 }
 
@@ -254,19 +284,23 @@ function gorDers(d) {
   const FILTRE = { tum: ['Tümü', () => true], yeni: ['Çalışılmadı', k => k.durum !== 'calisildi'], tekrar: ['Tekrar bekleyen', vadeli], zor: ['Zorlandıklarım', k => k.sonPuan === 'zor'] };
   if (!FILTRE[UI.filtre]) UI.filtre = 'tum';
   const ks = tum.filter(FILTRE[UI.filtre][1]);
-  let h = `<div class="bas"><button class="btn kucuk ghost" data-a="dersKapat">${ik('geri')} Dersler</button>
+  let h = `<div class="ustbar"><button class="btn kucuk ghost" data-a="dersKapat">${ik('geri')} Dersler</button>
     <button class="btn kucuk ghost" data-a="dersDuzenle" data-id="${d.id}">Düzenle</button></div>
-    <div class="dersbas">${halka(tum.length ? biten / tum.length : 0, 84, 9, esc(d.renk), `<b class="sayi">${biten}/${tum.length}</b><span>konu</span>`)}
-    <div><h1>${esc(d.ad)}</h1><div class="soluk kucuk">Zorluk ${zorlukYaz(d.zorluk)} · hazırlık %${oz.hazirlik ?? 0}</div></div></div>`;
-  if (Math.abs(carpan - 1) >= 0.08) h += `<p class="soluk kucuk">Bu derste konular tahmin edilenden ${carpan > 1 ? 'uzun' : 'kısa'} sürüyor;
+    <section class="dersust" style="--renk:${esc(d.renk)}"><div class="ustk">
+    ${halka(tum.length ? biten / tum.length : 0, 88, 9, esc(d.renk), `<b class="sayi">${biten}/${tum.length}</b><span>konu</span>`)}
+    <div><h1>${esc(d.ad)}</h1><div class="soluk kucuk" style="margin-top:6px">Zorluk ${zorlukYaz(d.zorluk)}</div></div></div>
+    <div class="ucluk"><div><b>%${oz.hazirlik ?? 0}</b><span>hatırlama</span></div>
+    <div><b>${tum.filter(vadeli).length}</b><span>tekrar bekliyor</span></div>
+    <div><b>${sureYaz(oz.kalanDk ?? tum.filter(k => k.durum !== 'calisildi').reduce((a, k) => a + tahminDk(k), 0))}</b><span>kalan çalışma</span></div></div></section>`;
+  if (Math.abs(carpan - 1) >= 0.08) h += `<p class="soluk kucuk" style="margin:10px 4px 0">Bu derste konular tahmin edilenden ${carpan > 1 ? 'uzun' : 'kısa'} sürüyor;
     program sürelerini ×${carpan.toFixed(1).replace('.', ',')} ile hesaplıyor.</p>`;
-  h += `<div class="bas"><h2>Konular</h2><button class="btn kucuk" data-a="konuEkle" data-id="${d.id}">${ik('arti')} Konu</button></div>`;
-  if (!tum.length) return h + `<div class="kart bos"><b>Henüz konu yok</b><br>Konuları her satıra bir tane yazarak toplu ekleyebilirsin.</div>`;
+  h += `<div class="bas bolum"><h2>Konular</h2><button class="btn kucuk" data-a="konuEkle" data-id="${d.id}">${ik('arti')} Konu</button></div>`;
+  if (!tum.length) return h + bosKart('Henüz konu yok', 'Konuları her satıra bir tane yazarak toplu ekleyebilirsin.');
   h += `<div class="cipler">${Object.entries(FILTRE).map(([a, [ad, f]]) =>
-    `<button class="cip ${a === UI.filtre ? 'secili' : ''}" data-a="filtre" data-f="${a}">${ad} <span class="sayi" style="opacity:.7">${tum.filter(f).length}</span></button>`).join('')}</div>`;
-  if (tum.length > 8) h += `<input type="search" id="ara" placeholder="Konu ara" aria-label="Konu ara" autocomplete="off">`;
+    `<button class="cip ${a === UI.filtre ? 'secili' : ''}" data-a="filtre" data-f="${a}">${ad}<span class="sayi">${tum.filter(f).length}</span></button>`).join('')}</div>`;
+  if (tum.length > 8) h += `<input type="search" id="ara" placeholder="Konu ara" aria-label="Konu ara" autocomplete="off" style="margin-top:4px">`;
   h += `<div class="kart">`;
-  if (!ks.length) h += `<div class="bos">Bu filtrede konu yok.</div>`;
+  if (!ks.length) h += `<div class="soluk" style="text-align:center;padding:10px">Bu filtrede konu yok.</div>`;
   else h += `<ul class="liste" id="konular">${ks.map(k => {
     const tamam = k.durum === 'calisildi';
     let alt = `<span class="soluk">Yaklaşık ${tahminDk(k)} dk</span>`;
@@ -277,7 +311,7 @@ function gorDers(d) {
     }
     return `<li data-ad="${esc(k.ad.toLocaleLowerCase('tr'))}"><button class="durum ${tamam ? 'tamam' : ''}" data-a="${tamam ? 'tekrarEt' : 'calistim'}" data-id="${k.id}"
       aria-label="${tamam ? 'Tekrar ettim' : 'Çalıştım'}">${tamam ? ik('tik') : ''}</button>
-      <div class="orta"><div class="ad">${esc(k.ad)}</div><div class="kucuk">${alt}</div></div>
+      <div class="orta"><div class="ad">${esc(k.ad)}</div><div class="kucuk" style="margin-top:2px">${alt}</div></div>
       <button class="ikon" data-a="konuDuzenle" data-id="${k.id}" aria-label="Konuyu düzenle">${ik('uc', 1)}</button></li>`;
   }).join('')}</ul>`;
   return h + `</div>`;
@@ -289,6 +323,15 @@ function sayacYazi() {
   return `${sn >= 3600 ? pad(Math.floor(sn / 3600)) + ':' : ''}${pad(Math.floor(sn / 60) % 60)}:${pad(sn % 60)}`;
 }
 const sayacOran = () => !S.sayac ? 0 : S.sayac.hedef ? sayacSn() / (S.sayac.hedef * 60) : (sayacSn() % 3600) / 3600;
+// Sayaç çemberi: dışta dakika çizgileri, içte ilerleme halkası.
+function sayacHalka(oran, renk, ic) {
+  const B = 252, r = 102, c = 2 * Math.PI * r, rc = 122, cc = 2 * Math.PI * rc, o = Math.min(1, Math.max(0, oran || 0));
+  return `<div class="halka" style="width:${B}px;height:${B}px;max-width:74vw;max-height:74vw"><svg viewBox="0 0 ${B} ${B}">
+    <circle class="cizik" cx="126" cy="126" r="${rc}" stroke-width="5" stroke-dasharray="1.6 ${cc / 60 - 1.6}"/>
+    <circle class="iz" cx="126" cy="126" r="${r}" stroke-width="13"/>
+    <circle class="dolu" id="zhalka" data-c="${c}" cx="126" cy="126" r="${r}" stroke-width="13" stroke="${renk}"
+      stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - o)}" transform="rotate(-90 126 126)"/></svg><div class="ic">${ic}</div></div>`;
+}
 function dersSecenek(secili) {
   return S.komiteler.map(k => {
     const ds = S.dersler.filter(d => d.komiteId === k.id);
@@ -302,48 +345,47 @@ function konuSecenek(dersId, secili) {
 }
 
 function gorSure() {
-  let h = `<h1>Çalışma süresi</h1>`;
-  if (!S.dersler.length) return h + `<div class="kart bos"><b>Önce bir ders ekle</b><br>Süre kayıtları derslere bağlı tutulur.
-    <p><button class="btn" data-a="sekme" data-s="dersler">${ik('arti')} Ders ekle</button></p></div>`;
+  let h = `<div class="ustbar"><h1>Odak</h1></div>`;
+  if (!S.dersler.length) return h + bosKart('Önce bir ders ekle', 'Süre kayıtları derslere bağlı tutulur.',
+    `<button class="btn parlak" data-a="sekme" data-s="dersler">${ik('arti')} Ders ekle</button>`);
   const c = S.sayac;
   if (!dersBul(UI.sDers)) { UI.sDers = (aktifDersler()[0] || S.dersler[0]).id; UI.sKonu = ''; }
   if (c) {
-    const d = dersBul(c.dersId), k = konuBul(c.konuId);
-    h += `<div class="kart sayac">${halka(sayacOran(), 240, 14, esc(d ? d.renk : 'var(--ana)'),
-      `<div class="zaman" id="zaman">${sayacYazi()}</div><small>${c.hedef ? `hedef ${c.hedef} dk` : 'serbest'}</small>`, 'zhalka')}
-      <div style="text-align:center"><b>${esc(d ? d.ad : 'Silinmiş ders')}</b>${k ? `<div class="soluk kucuk">${esc(k.ad)}</div>` : ''}</div>
-      <div class="sira" style="justify-content:center"><button class="btn" data-a="sayacDur">Bitir ve kaydet</button>
+    const d = dersBul(c.dersId), k = konuBul(c.konuId), renk = d ? d.renk : '#2dd4bf';
+    h += `<section class="odak" style="--renk:${esc(renk)}">${sayacHalka(sayacOran(), esc(renk),
+      `<div class="zaman" id="zaman">${sayacYazi()}</div><small>${c.hedef ? `hedef ${c.hedef} dk` : 'serbest çalışma'}</small>`)}
+      <div class="konu"><b>${esc(d ? d.ad : 'Silinmiş ders')}</b>${k ? `<div>${esc(k.ad)}</div>` : ''}</div>
+      <div class="sira" style="justify-content:center"><button class="btn" data-a="sayacDur">${ik('tik')} Bitir ve kaydet</button>
       <button class="btn ghost" data-a="sayacIptal">Vazgeç</button></div>
-      <p class="soluk kucuk" style="text-align:center">Uygulamayı kapatsan da sayaç çalışmaya devam eder.</p></div>`;
+      <p class="not">Uygulamayı kapatsan da sayaç çalışmaya devam eder.</p></section>`;
   } else {
-    h += `<div class="kart sayac">${halka(0, 200, 14, 'var(--ana)', `<div class="zaman">${UI.sHedef ? pad(UI.sHedef) + ':00' : '00:00'}</div><small>${UI.sHedef ? 'hedef süre' : 'serbest'}</small>`)}
+    const d = dersBul(UI.sDers);
+    h += `<section class="odak" style="--renk:${esc(d.renk)}">${sayacHalka(0, esc(d.renk),
+      `<div class="zaman">${UI.sHedef ? pad(UI.sHedef) + ':00' : '00:00'}</div><small>${UI.sHedef ? 'hedef süre' : 'serbest çalışma'}</small>`)}
       <div class="alan"><div class="bolme" role="group" aria-label="Hedef süre">${[[0, 'Serbest'], [25, '25 dk'], [50, '50 dk'], [90, '90 dk']].map(([v, ad]) =>
         `<button class="${UI.sHedef === v ? 'secili' : ''}" data-a="hedefSec" data-v="${v}">${ad}</button>`).join('')}</div>
       <label for="sDers">Ders</label><select id="sDers" data-d="sDers">${dersSecenek(UI.sDers)}</select>
       <label for="sKonu">Konu</label><select id="sKonu" data-d="sKonu">${konuSecenek(UI.sDers, UI.sKonu)}</select></div>
-      <div class="sira" style="justify-content:center;margin-top:6px"><button class="btn" data-a="sayacBasla">${ik('oynat', 1)} Başlat</button>
-      <button class="btn ghost" data-a="elleEkle">Elle süre ekle</button></div></div>`;
+      <div class="sira" style="justify-content:center;margin-top:4px"><button class="btn" data-a="sayacBasla">${ik('oynat', 1)} Başlat</button>
+      <button class="btn ghost" data-a="elleEkle">Elle süre ekle</button></div></section>`;
   }
   const son = [...S.oturumlar].sort((a, b) => a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : b.id < a.id ? -1 : 1).slice(0, 40);
-  h += `<h2>Son kayıtlar</h2><div class="kart">`;
-  if (!son.length) h += `<div class="bos">Henüz kayıt yok.</div>`;
-  else {
-    let gun = '';
-    h += `<ul class="liste">`;
-    for (const o of son) {
-      if (o.tarih !== gun) {
-        gun = o.tarih;
-        const top = S.oturumlar.reduce((a, x) => a + (x.tarih === gun ? x.dk : 0), 0);
-        h += `<li class="gunbas" style="padding-bottom:0"><span>${gun === bugun() ? 'Bugün' : tarihYaz(gun)}</span><span>${sureYaz(top)}</span></li>`;
-      }
-      const d = dersBul(o.dersId) || { ad: 'Silinmiş ders', renk: '#888' }, k = konuBul(o.konuId);
-      h += `<li style="border-top:0"><span class="nokta" style="background:${esc(d.renk)}"></span><div class="orta"><div class="ad">${esc(d.ad)}</div>
-        ${k ? `<div class="soluk kucuk">${esc(k.ad)}</div>` : ''}</div><span class="sayi">${sureYaz(o.dk)}</span>
-        <button class="ikon" data-a="oturumSil" data-id="${o.id}" aria-label="Kaydı sil">${ik('carpi')}</button></li>`;
+  h += `<h2>Son kayıtlar</h2>`;
+  if (!son.length) return h + `<div class="kart soluk" style="text-align:center">Henüz kayıt yok.</div>`;
+  let gun = '';
+  h += `<div class="kart"><ul class="liste">`;
+  for (const o of son) {
+    if (o.tarih !== gun) {
+      gun = o.tarih;
+      const top = S.oturumlar.reduce((a, x) => a + (x.tarih === gun ? x.dk : 0), 0);
+      h += `<li class="gunbas"><span>${gun === bugun() ? 'Bugün' : tarihYaz(gun)}</span><span>${sureYaz(top)}</span></li>`;
     }
-    h += `</ul>`;
+    const d = dersBul(o.dersId) || { ad: 'Silinmiş ders', renk: '#888' }, k = konuBul(o.konuId);
+    h += `<li>${rozet(d)}<div class="orta"><div class="ad">${esc(d.ad)}</div>
+      ${k ? `<div class="soluk kucuk">${esc(k.ad)}</div>` : ''}</div><b class="sayi">${sureYaz(o.dk)}</b>
+      <button class="ikon" data-a="oturumSil" data-id="${o.id}" aria-label="Kaydı sil">${ik('carpi')}</button></li>`;
   }
-  return h + `</div>`;
+  return h + `</ul></div>`;
 }
 
 function gorOzet() {
@@ -352,30 +394,37 @@ function gorOzet() {
   for (const o of S.oturumlar) gunDk.set(o.tarih, (gunDk.get(o.tarih) || 0) + o.dk);
   const gunluk = Array.from({ length: 7 }, (_, i) => gunDk.get(gunEkle(bas, i)) || 0), dersDk = new Map();
   for (const o of S.oturumlar) if (o.tarih >= bas && o.tarih <= son) dersDk.set(o.dersId, (dersDk.get(o.dersId) || 0) + o.dk);
-  const toplam = gunluk.reduce((a, b) => a + b, 0), mx = Math.max(...gunluk, 1);
+  const toplam = gunluk.reduce((a, b) => a + b, 0), mx = Math.max(...gunluk, ...S.ayar.gunluk, 1);
   let yeni = 0, tekrar = 0;
   for (const k of S.konular) {
     if (k.calisildiTarih >= bas && k.calisildiTarih <= son) yeni++;
     for (const r of k.tekrarlar || []) if (r.tarih >= bas && r.tarih <= son) tekrar++;
   }
   const hedef = S.ayar.gunluk.reduce((a, b) => a + b, 0);
-  let h = `<h1>Özet</h1><div class="bas" style="margin-top:10px"><button class="btn kucuk ghost" data-a="hafta" data-n="-1" aria-label="Önceki hafta">${ik('geri')}</button>
-    <b>${tarihYaz(bas, 'gun')} – ${tarihYaz(son, 'gun')}${UI.hafta === 0 ? ' · bu hafta' : ''}</b>
-    <button class="btn kucuk ghost" data-a="hafta" data-n="1" ${UI.hafta >= 0 ? 'disabled' : ''} aria-label="Sonraki hafta">${ik('ileri')}</button></div>
-    <div class="kutular dort" style="margin-top:12px"><div class="kutu"><b>${sureYaz(toplam)}</b><span>toplam çalışma</span></div>
-    <div class="kutu"><b>%${hedef ? Math.round(toplam / hedef * 100) : 0}</b><span>haftalık hedef</span></div>
-    <div class="kutu"><b>${yeni}</b><span>yeni konu</span></div><div class="kutu"><b>${tekrar}</b><span>tekrar</span></div></div>
+  const kutu1 = (simge, renk, deger, ad) => `<div class="kutu" style="--k:${renk}"><span class="sim">${ik(simge)}</span><b>${deger}</b><span>${ad}</span></div>`;
+  let h = `<div class="ustbar"><h1>Özet</h1><div class="sira" style="flex-wrap:nowrap">
+    <button class="btn kucuk ghost" data-a="hafta" data-n="-1" aria-label="Önceki hafta">${ik('geri')}</button>
+    <b class="kucuk" style="white-space:nowrap">${UI.hafta === 0 ? 'Bu hafta' : `${tarihYaz(bas, 'gun')} – ${tarihYaz(son, 'gun')}`}</b>
+    <button class="btn kucuk ghost" data-a="hafta" data-n="1" ${UI.hafta >= 0 ? 'disabled' : ''} aria-label="Sonraki hafta">${ik('ileri')}</button></div></div>
+    <div class="kutular" style="margin-top:0">${kutu1('saat', 'var(--ana)', sureYaz(toplam), 'toplam çalışma')}
+    ${kutu1('hedef', 'var(--ana2)', '%' + (hedef ? Math.round(toplam / hedef * 100) : 0), 'haftalık hedef')}
+    ${kutu1('kitap', 'var(--vurgu)', yeni, 'yeni konu')}${kutu1('yenile', '#ec4899', tekrar, 'tekrar')}</div>
     <div class="iki"><div><div class="kart"><b>Günlere göre</b>
     <div class="grafik">${gunluk.map((dk, i) => `<div class="s ${gunEkle(bas, i) === t ? 'bugun' : ''}">
       <span class="d">${dk ? (dk >= 60 ? (dk / 60).toFixed(1).replace('.', ',') + ' sa' : dk + ' dk') : ''}</span>
-      <div class="b ${dk ? '' : 'sifir'}" style="height:${dk / mx * 100}%"></div><span class="g">${GUN_KISA[i]}</span></div>`).join('')}</div></div>`;
+      <div class="kol"><div class="b ${dk ? '' : 'sifir'}" style="height:${dk / mx * 100}%"></div>
+      ${S.ayar.gunluk[i] ? `<span class="h" style="bottom:${S.ayar.gunluk[i] / mx * 100}%"></span>` : ''}</div>
+      <span class="g">${GUN_KISA[i]}</span></div>`).join('')}</div>
+    <div class="aciklama"><i></i> günlük hedef</div></div>`;
   h += `<div class="kart"><b>Derslere göre</b>`;
   const sirali = [...dersDk.entries()].sort((a, b) => b[1] - a[1]);
-  if (!sirali.length) h += `<div class="bos">Bu hafta kayıtlı çalışma yok.</div>`;
+  const dersi = id => dersBul(id) || { ad: 'Silinmiş ders', renk: '#888' };
+  if (!sirali.length) h += `<div class="soluk" style="text-align:center;padding:16px">Bu hafta kayıtlı çalışma yok.</div>`;
+  else h += `<div class="yigin" role="img" aria-label="Derslere göre süre dağılımı">${sirali.map(([id, dk]) =>
+    `<i style="width:${dk / toplam * 100}%;background:${esc(dersi(id).renk)}"></i>`).join('')}</div>`;
   for (const [id, dk] of sirali) {
-    const d = dersBul(id) || { ad: 'Silinmiş ders', renk: '#888' };
-    h += `<div class="yatay"><span class="ad">${esc(d.ad)}</span><div class="cubuk"><i style="width:${dk / sirali[0][1] * 100}%;background:${esc(d.renk)}"></i></div>
-      <span class="soluk sayi">${sureYaz(dk)}</span></div>`;
+    h += `<div class="yatay"><span class="nokta" style="background:${esc(dersi(id).renk)}"></span><span class="ad">${esc(dersi(id).ad)}</span>
+      <span class="soluk sayi">${sureYaz(dk)} · %${Math.round(dk / toplam * 100)}</span></div>`;
   }
   h += `</div></div><div>`;
   // Son 16 haftanın ısı haritası
@@ -388,16 +437,16 @@ function gorOzet() {
     hucre += `<i class="s${s} ${g === t ? 'bg' : ''}" title="${tarihYaz(g)}: ${sureYaz(dk)}"></i>`;
   }
   const aktif = [...gunDk.keys()].filter(g => g >= ilk).length;
-  h += `<div class="kart"><div class="bas"><b>Son ${HAFTA} hafta</b><span class="soluk kucuk">${seri()} günlük seri · ${aktif} aktif gün</span></div>
+  h += `<div class="kart"><div class="bas"><b>Son ${HAFTA} hafta</b><span class="soluk kucuk">${seri()} gün seri · ${aktif} aktif gün</span></div>
     <div class="isi" role="img" aria-label="Son ${HAFTA} haftada ${aktif} gün çalışma kaydı var">${hucre}</div>
     <div class="lejant">az <i></i><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i> çok</div></div>`;
   const dersler = aktifDersler();
   const tum = dersler.flatMap(d => dersKonulari(d.id)), bit = tum.filter(k => k.durum === 'calisildi').length;
-  h += `<div class="kart"><div class="bas"><b>${esc(aktifKomite().ad)}</b><span class="sayi">${bit} / ${tum.length} konu</span></div>
+  h += `<div class="kart"><div class="bas"><b>${esc(aktifKomite().ad)}</b><span class="sayi soluk kucuk">${bit} / ${tum.length} konu</span></div>
     <div class="cubuk"><i style="width:${tum.length ? bit / tum.length * 100 : 0}%"></i></div>`;
   for (const d of dersler) {
     const ks = dersKonulari(d.id), b = ks.filter(k => k.durum === 'calisildi').length;
-    h += `<div class="yatay"><span class="ad">${esc(d.ad)}</span><div class="cubuk"><i style="width:${ks.length ? b / ks.length * 100 : 0}%;background:${esc(d.renk)}"></i></div>
+    h += `<div class="yatay cub"><span class="ad">${esc(d.ad)}</span><div class="cubuk"><i style="width:${ks.length ? b / ks.length * 100 : 0}%;background:${esc(d.renk)}"></i></div>
       <span class="soluk sayi">${b}/${ks.length} · %${Algo.dersOzet(S, d.id, t).hazirlik ?? 0}</span></div>`;
   }
   return h + `<p class="soluk kucuk" style="margin-top:12px">Yüzdeler, konuları bugün ne kadar hatırladığına dair tahmindir.</p></div></div></div>`;
@@ -405,30 +454,31 @@ function gorOzet() {
 
 function gorAyarlar() {
   const a = S.ayar;
-  return `<h1>Ayarlar</h1><div class="iki"><div>
-  <div class="kart"><b>Görünüm</b>
-    <div class="bolme" style="margin-top:10px" role="group" aria-label="Tema">${[['', 'Sistem'], ['acik', 'Açık'], ['koyu', 'Koyu']].map(([v, ad]) =>
+  const bas = (simge, ad) => `<div class="ayar-bas"><span class="sim">${ik(simge)}</span><b>${ad}</b></div>`;
+  return `<div class="ustbar"><h1>Ayarlar</h1></div><div class="iki"><div>
+  <div class="kart" style="margin-top:0">${bas('gunes', 'Görünüm')}
+    <div class="bolme" style="margin-top:12px" role="group" aria-label="Tema">${[['', 'Sistem'], ['acik', 'Açık'], ['koyu', 'Koyu']].map(([v, ad]) =>
       `<button class="${(a.tema || '') === v ? 'secili' : ''}" data-a="tema" data-v="${v}">${ad}</button>`).join('')}</div></div>
-  <div class="kart"><b>Günlük çalışma hedefi (dakika)</b>
-    <p class="soluk kucuk">Program her güne en fazla bu kadar iş yazar. Çalışmayacağın güne 0 yaz.</p>
+  <div class="kart">${bas('hedef', 'Günlük çalışma hedefi')}
+    <p class="soluk kucuk">Dakika olarak. Program her güne en fazla bu kadar iş yazar; çalışmayacağın güne 0 yaz.</p>
     <div class="gunler">${GUN_KISA.map((g, i) => `<div><label for="g${i}">${g}</label>
       <input id="g${i}" type="number" inputmode="numeric" min="0" max="900" step="5" value="${a.gunluk[i]}" data-d="gunluk" data-i="${i}"></div>`).join('')}</div></div>
-  <div class="kart"><b>Tekrar ve sınav</b>
+  <div class="kart">${bas('yenile', 'Tekrar ve sınav')}
     <label for="ar">Tekrar sıklığı tercihi (gün). 1, 7, 30 normal tempodur; daha küçük sayılar daha sık, daha büyükler daha seyrek tekrar demek.</label>
     <input id="ar" type="text" inputmode="numeric" value="${a.araliklar.join(', ')}" data-d="araliklar">
     <label for="tg">Sınavdan önce genel tekrara ayrılacak gün sayısı</label>
     <input id="tg" type="number" inputmode="numeric" min="0" max="14" value="${a.tekrarGunu}" data-d="tekrarGunu"></div>
   </div><div>
-  <div class="kart"><b>Yedekleme</b>
+  <div class="kart" style="margin-top:0">${bas('indir', 'Yedekleme')}
     <p class="soluk kucuk">Verilerin yalnızca bu cihazda durur. Ara sıra yedek dosyası indirmeni öneririm; başka cihaza taşımak için de aynı dosyayı geri yüklersin.</p>
-    <div class="sira"><button class="btn" data-a="disaAktar">Yedeği indir</button>
-    <button class="btn ghost" data-a="iceAktar">Yedekten geri yükle</button></div>
+    <div class="sira" style="margin-top:12px"><button class="btn" data-a="disaAktar">Yedeği indir</button>
+    <button class="btn ghost" data-a="iceAktar">Geri yükle</button></div>
     <input type="file" id="dosya" accept="application/json,.json" hidden></div>
-  <div class="kart"><b>Telefona kurulum</b>
+  <div class="kart">${bas('telefon', 'Telefona kurulum')}
     <p class="soluk kucuk">Android (Chrome): menü › "Ana ekrana ekle" ya da "Uygulamayı yükle". iPhone ve iPad (Safari): Paylaş › "Ana Ekrana Ekle".
     Kurulduktan sonra internet olmadan da açılır.</p></div>
-  <div class="kart"><button class="btn tehlike" data-a="sifirla">Tüm verileri sil</button></div>
-  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 1.2</p></div></div>`;
+  <div class="kart"><button class="btn tehlike blok" data-a="sifirla">Tüm verileri sil</button></div>
+  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 2.0</p></div></div>`;
 }
 
 const GORUNUM = { bugun: gorBugun, dersler: gorDersler, sure: gorSure, ozet: gorOzet, ayarlar: gorAyarlar };
@@ -437,6 +487,13 @@ function ciz() {
   for (const b of document.querySelectorAll('#nav button')) b.classList.toggle('secili', b.dataset.s === UI.sekme);
   const sec = $('.gunp.secili');
   if (sec) sec.scrollIntoView({ inline: 'center', block: 'nearest' });
+  if (UI.anim) {
+    UI.anim = false;
+    const app = $('#app'); app.classList.remove('gir'); void app.offsetWidth; app.classList.add('gir');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      for (const e of document.querySelectorAll('.dolu[data-h]')) e.setAttribute('stroke-dashoffset', e.dataset.h);
+    }));
+  }
   tik();
 }
 
@@ -479,18 +536,16 @@ const zorlukSecici = z => `<label for="fz">Zorluk (program buna göre süre ve �
 function puanKutusu(k, sayactan) {
   const ilk = k.durum !== 'calisildi';
   const baslik = sayactan ? (ilk ? 'Konuyu bitirdin mi?' : 'Tekrarı tamamladın mı?') : (ilk ? 'Nasıl geçti?' : 'Tekrar nasıl geçti?');
-  kutu(baslik, `<p class="soluk">${esc(k.ad)}</p><div class="puanbuyuk">
+  const yuz = { zor: 'yuzZor', orta: 'yuzOrta', kolay: 'yuzKolay' };
+  kutu(baslik, `<p class="soluk" style="margin:-8px 0 16px">${esc(k.ad)}</p><div class="puanbuyuk">
     ${['zor', 'orta', 'kolay'].map(p => `<button type="button" class="${p}R" data-a="puan" data-id="${k.id}" data-p="${p}">
-    ${PUAN_AD[p]}<small>${Algo.sonrakiAralik(S, k, p, bugun())} gün sonra tekrar</small></button>`).join('')}</div>`,
+    <span class="yz">${ik(yuz[p])}</span><span>${PUAN_AD[p]}<small>${Algo.sonrakiAralik(S, k, p, bugun())} gün sonra tekrar</small></span></button>`).join('')}</div>`,
     null, '', sayactan ? 'Henüz bitmedi' : 'Vazgeç');
 }
 
 /* ---------- eylemler ---------- */
 const A = {
-  sekme(el) {
-    UI.sekme = el.dataset.s; if (UI.sekme !== 'dersler') UI.dersId = null; ciz(); scrollTo(0, 0);
-    const app = $('#app'); app.classList.remove('gir'); void app.offsetWidth; app.classList.add('gir');
-  },
+  sekme(el) { UI.sekme = el.dataset.s; if (UI.sekme !== 'dersler') UI.dersId = null; UI.anim = true; ciz(); scrollTo(0, 0); },
   kapat() { $('#dlg').close(); },
   gunSec(el) { UI.gun = Number(el.dataset.i); const y = scrollY; ciz(); scrollTo(0, y); },
   filtre(el) { UI.filtre = el.dataset.f; const y = scrollY; ciz(); scrollTo(0, y); },
@@ -543,8 +598,8 @@ const A = {
     S.dersler = S.dersler.filter(d => d.id !== el.dataset.id);
     UI.dersId = null; $('#dlg').close(); kaydet(); ciz();
   },
-  dersAc(el) { UI.dersId = el.dataset.id; UI.filtre = 'tum'; ciz(); scrollTo(0, 0); },
-  dersKapat() { UI.dersId = null; ciz(); },
+  dersAc(el) { UI.dersId = el.dataset.id; UI.filtre = 'tum'; UI.anim = true; ciz(); scrollTo(0, 0); },
+  dersKapat() { UI.dersId = null; UI.anim = true; ciz(); },
 
   konuEkle(el) {
     kutu('Konu ekle', `<label for="fk">Her satıra bir konu yaz</label>
