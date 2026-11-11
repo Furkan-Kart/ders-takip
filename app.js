@@ -56,6 +56,8 @@ const IK = {
   gunes: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/>',
   indir: '<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
   telefon: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>',
+  yukari: '<path d="M6 15l6-6 6 6"/>',
+  asagi: '<path d="M6 9l6 6 6-6"/>',
   yuzZor: '<circle cx="12" cy="12" r="9"/><path d="M8.5 16c1-1.6 6-1.6 7 0M9 10h.01M15 10h.01"/>',
   yuzOrta: '<circle cx="12" cy="12" r="9"/><path d="M8.5 15.5h7M9 10h.01M15 10h.01"/>',
   yuzKolay: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 2 6 2 7 0M9 10h.01M15 10h.01"/>'
@@ -65,11 +67,41 @@ let halkaNo = 0;
 function halka(oran, boy, kalinlik, renk, ic = '', id = '', renk2 = '') {
   const r = (boy - kalinlik) / 2, c = 2 * Math.PI * r, o = Math.min(1, Math.max(0, oran || 0)), son = c * (1 - o), g = 'hg' + (++halkaNo);
   return `<div class="halka" style="width:${boy}px;height:${boy}px"><svg viewBox="0 0 ${boy} ${boy}">
-    ${renk2 ? `<defs><linearGradient id="${g}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${renk2}"/><stop offset="1" stop-color="${renk}"/></linearGradient></defs>` : ''}
+    ${renk2 ? `<defs><linearGradient id="${g}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:${renk2}"/><stop offset="1" style="stop-color:${renk}"/></linearGradient></defs>` : ''}
     <circle class="iz" cx="${boy / 2}" cy="${boy / 2}" r="${r}" stroke-width="${kalinlik}"/>
     <circle class="dolu" ${id ? `id="${id}" data-c="${c}"` : ''} data-h="${son}" cx="${boy / 2}" cy="${boy / 2}" r="${r}" stroke-width="${kalinlik}"
       stroke="${renk2 ? `url(#${g})` : renk}" stroke-dasharray="${c}" stroke-dashoffset="${UI.anim ? c : son}" transform="rotate(-90 ${boy / 2} ${boy / 2})"/></svg>
     <div class="ic">${ic}</div></div>`;
+}
+
+// Sayıların sıfırdan hedefe doğru sayarak belirmesi (yalnızca ekran geçişlerinde).
+const bicimle = (n, b) => b === 'sure' ? sureYaz(n) : b === 'yuzde' ? '%' + Math.round(n) : String(Math.round(n));
+const say = (n, b) => `<span data-n="${n}" data-b="${b}">${bicimle(UI.anim ? 0 : n, b)}</span>`;
+const azHareket = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function saydir() {
+  const liste = [...document.querySelectorAll('span[data-b]')];
+  if (azHareket()) { for (const e of liste) e.textContent = bicimle(+e.dataset.n, e.dataset.b); return; }
+  const t0 = performance.now(), sure = 850;
+  const adim = an => {
+    const p = Math.min(1, Math.max(0, (an - t0) / sure)), y = 1 - Math.pow(1 - p, 3);
+    for (const e of liste) e.textContent = bicimle(+e.dataset.n * y, e.dataset.b);
+    if (p < 1) requestAnimationFrame(adim);
+  };
+  requestAnimationFrame(adim);
+}
+const titre = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch {} };
+// Küçük konfeti patlaması: iş tamamlanınca ve günün programı bitince.
+function kutla(x, y, adet) {
+  if (azHareket()) return;
+  const k = document.createElement('div'); k.className = 'konfeti'; k.style.left = x + 'px'; k.style.top = y + 'px';
+  const renk = ['#2dd4bf', '#818cf8', '#fbbf24', '#f472b6', '#34d399', '#60a5fa'];
+  for (let i = 0; i < adet; i++) {
+    const p = document.createElement('i'), aci = Math.random() * Math.PI * 2, hiz = 40 + Math.random() * (adet > 30 ? 190 : 80);
+    p.style.cssText = `--dx:${Math.cos(aci) * hiz}px;--dy:${Math.sin(aci) * hiz - 30}px;--d:${Math.random() * 540 - 270}deg;background:${renk[i % renk.length]};animation-delay:${Math.random() * 90}ms`;
+    if (i % 3 === 0) p.style.borderRadius = '50%';
+    k.append(p);
+  }
+  document.body.append(k); setTimeout(() => k.remove(), 1500);
 }
 
 /* ---------- veri ---------- */
@@ -201,9 +233,9 @@ function gorBugun() {
   let h = `<section class="hero"><div class="ust"><span>${tarihYaz(t, 'uzun')}</span>
     ${sr ? `<span class="hap sari">${ik('alev', 1)}${sr} gün seri</span>` : ''}</div>
     <div class="govde"><div><h1>${selam}</h1><p class="alt">${esc(kom.ad)}${p.sinav ? ' · ' + esc(p.sinav.ad) : ''}</p></div>
-    ${halka(hedef ? calisilan / hedef : 0, 116, 11, '#ffffff', `<b class="sayi">${calisilan}</b><span>/ ${hedef} dk</span>`, '', '#5eead4')}</div>
+    ${halka(hedef ? calisilan / hedef : 0, 116, 11, '#ffffff', `<b class="sayi">${say(calisilan, 'sayi')}</b><span>/ ${hedef} dk</span>`, '', '#5eead4')}</div>
     ${konuVar ? `<div class="camlar"><div><b>${sinavG === null ? '–' : sinavG + ' gün'}</b><span>sınava kalan</span></div>
-      <div><b>%${p.ozet.hazirlik ?? 0}</b><span>hazırlık</span></div>
+      <div><b>${say(p.ozet.hazirlik ?? 0, 'yuzde')}</b><span>hazırlık</span></div>
       <div><b>${sureYaz(kalanDk)}</b><span>bugün kalan iş</span></div></div>` : ''}</section>`;
   if (!konuVar) {
     return h + bosKart('Henüz ders veya konu yok', 'Derslerini ve konularını ekleyince günlük çalışma programın burada kendiliğinden oluşur.',
@@ -394,62 +426,89 @@ function gorOzet() {
   for (const o of S.oturumlar) gunDk.set(o.tarih, (gunDk.get(o.tarih) || 0) + o.dk);
   const gunluk = Array.from({ length: 7 }, (_, i) => gunDk.get(gunEkle(bas, i)) || 0), dersDk = new Map();
   for (const o of S.oturumlar) if (o.tarih >= bas && o.tarih <= son) dersDk.set(o.dersId, (dersDk.get(o.dersId) || 0) + o.dk);
-  const toplam = gunluk.reduce((a, b) => a + b, 0), mx = Math.max(...gunluk, ...S.ayar.gunluk, 1);
+  const toplam = gunluk.reduce((a, b) => a + b, 0);
+  let onceki = 0;
+  for (let i = 1; i <= 7; i++) onceki += gunDk.get(gunEkle(bas, -i)) || 0;
   let yeni = 0, tekrar = 0;
   for (const k of S.konular) {
     if (k.calisildiTarih >= bas && k.calisildiTarih <= son) yeni++;
     for (const r of k.tekrarlar || []) if (r.tarih >= bas && r.tarih <= son) tekrar++;
   }
   const hedef = S.ayar.gunluk.reduce((a, b) => a + b, 0);
-  const kutu1 = (simge, renk, deger, ad) => `<div class="kutu" style="--k:${renk}"><span class="sim">${ik(simge)}</span><b>${deger}</b><span>${ad}</span></div>`;
-  let h = `<div class="ustbar"><h1>Özet</h1><div class="sira" style="flex-wrap:nowrap">
-    <button class="btn kucuk ghost" data-a="hafta" data-n="-1" aria-label="Önceki hafta">${ik('geri')}</button>
-    <b class="kucuk" style="white-space:nowrap">${UI.hafta === 0 ? 'Bu hafta' : `${tarihYaz(bas, 'gun')} – ${tarihYaz(son, 'gun')}`}</b>
-    <button class="btn kucuk ghost" data-a="hafta" data-n="1" ${UI.hafta >= 0 ? 'disabled' : ''} aria-label="Sonraki hafta">${ik('ileri')}</button></div></div>
-    <div class="kutular" style="margin-top:0">${kutu1('saat', 'var(--ana)', sureYaz(toplam), 'toplam çalışma')}
-    ${kutu1('hedef', 'var(--ana2)', '%' + (hedef ? Math.round(toplam / hedef * 100) : 0), 'haftalık hedef')}
-    ${kutu1('kitap', 'var(--vurgu)', yeni, 'yeni konu')}${kutu1('yenile', '#ec4899', tekrar, 'tekrar')}</div>
-    <div class="iki"><div><div class="kart"><b>Günlere göre</b>
-    <div class="grafik">${gunluk.map((dk, i) => `<div class="s ${gunEkle(bas, i) === t ? 'bugun' : ''}">
-      <span class="d">${dk ? (dk >= 60 ? (dk / 60).toFixed(1).replace('.', ',') + ' sa' : dk + ' dk') : ''}</span>
-      <div class="kol"><div class="b ${dk ? '' : 'sifir'}" style="height:${dk / mx * 100}%"></div>
-      ${S.ayar.gunluk[i] ? `<span class="h" style="bottom:${S.ayar.gunluk[i] / mx * 100}%"></span>` : ''}</div>
-      <span class="g">${GUN_KISA[i]}</span></div>`).join('')}</div>
-    <div class="aciklama"><i></i> günlük hedef</div></div>`;
+  const gecenGun = UI.hafta === 0 ? haftaGunu(t) + 1 : 7;
+  const fark = onceki ? Math.round((toplam - onceki) / onceki * 100) : null;
+  const farkYazi = fark === null ? `<span class="degisim">Önceki hafta kayıt yok</span>`
+    : `<span class="degisim ${fark >= 0 ? 'art' : 'az'}">${ik(fark >= 0 ? 'yukari' : 'asagi')}%${Math.abs(fark)} önceki haftaya göre</span>`;
+
+  let h = `<div class="ustbar"><h1>Özet</h1><div class="haftasec">
+    <button data-a="hafta" data-n="-1" aria-label="Önceki hafta">${ik('geri')}</button>
+    <b>${UI.hafta === 0 ? 'Bu hafta' : `${tarihYaz(bas, 'gun')} – ${tarihYaz(son, 'gun')}`}</b>
+    <button data-a="hafta" data-n="1" ${UI.hafta >= 0 ? 'disabled' : ''} aria-label="Sonraki hafta">${ik('ileri')}</button></div></div>
+    <section class="kart ozh"><div class="ozh-ust"><div class="orta">
+      <span class="soluk kucuk">${UI.hafta === 0 ? 'Bu hafta' : 'O hafta'} çalışma süresi</span>
+      <div class="buyuk">${say(toplam, 'sure')}</div>${farkYazi}</div>
+      ${halka(hedef ? toplam / hedef : 0, 96, 10, 'var(--ana)', `<b>${say(hedef ? toplam / hedef * 100 : 0, 'yuzde')}</b><span>hedef</span>`, '', 'var(--ana2)')}</div>
+    <div class="ucluk"><div><b>${say(yeni, 'sayi')}</b><span>yeni konu</span></div><div><b>${say(tekrar, 'sayi')}</b><span>tekrar</span></div>
+      <div><b>${say(toplam / gecenGun, 'sure')}</b><span>ortalama / gün</span></div></div></section>`;
+
+  // Günlere göre: soluk sütun günlük hedefi, dolu sütun çalışılan süreyi gösterir.
+  const mx = Math.max(...gunluk, ...S.ayar.gunluk, 30);
+  const kisa = dk => dk >= 60 ? (dk / 60).toFixed(1).replace('.', ',').replace(',0', '') + ' sa' : dk + ' dk';
+  h += `<div class="iki"><div><div class="kart"><div class="bas"><b>Günlere göre</b>
+    <span class="lej"><i class="l1"></i>çalışılan<i class="l2"></i>hedef</span></div>
+    <div class="grafik" role="img" aria-label="Günlere göre çalışma süresi ve günlük hedef">${gunluk.map((dk, i) => {
+      const hd = S.ayar.gunluk[i], g = gunEkle(bas, i);
+      return `<div class="s ${g === t ? 'bugun' : ''}"><div class="alan">
+        ${dk ? `<span class="d" style="bottom:calc(${Math.max(dk, hd) / mx * 100}% + 6px)">${kisa(dk)}</span>` : ''}
+        ${hd ? `<i class="hd" style="height:${hd / mx * 100}%"></i>` : ''}
+        ${dk ? `<i class="b ${hd && dk >= hd ? 'tam' : ''}" style="height:${Math.max(dk / mx * 100, 4)}%;--i:${i}"></i>` : ''}</div>
+        <span class="g">${GUN_KISA[i]}</span></div>`;
+    }).join('')}</div></div>`;
+
   h += `<div class="kart"><b>Derslere göre</b>`;
   const sirali = [...dersDk.entries()].sort((a, b) => b[1] - a[1]);
   const dersi = id => dersBul(id) || { ad: 'Silinmiş ders', renk: '#888' };
-  if (!sirali.length) h += `<div class="soluk" style="text-align:center;padding:16px">Bu hafta kayıtlı çalışma yok.</div>`;
+  if (!sirali.length) h += `<div class="soluk" style="text-align:center;padding:18px 0 6px">Bu hafta kayıtlı çalışma yok.</div>`;
   else h += `<div class="yigin" role="img" aria-label="Derslere göre süre dağılımı">${sirali.map(([id, dk]) =>
     `<i style="width:${dk / toplam * 100}%;background:${esc(dersi(id).renk)}"></i>`).join('')}</div>`;
   for (const [id, dk] of sirali) {
     h += `<div class="yatay"><span class="nokta" style="background:${esc(dersi(id).renk)}"></span><span class="ad">${esc(dersi(id).ad)}</span>
-      <span class="soluk sayi">${sureYaz(dk)} · %${Math.round(dk / toplam * 100)}</span></div>`;
+      <span class="sayi"><b>${sureYaz(dk)}</b> <span class="soluk">%${Math.round(dk / toplam * 100)}</span></span></div>`;
   }
   h += `</div></div><div>`;
-  // Son 16 haftanın ısı haritası
+
+  // Son 16 haftanın ısı haritası (sütun = hafta, satır = gün)
   const HAFTA = 16, ilk = gunEkle(haftaBasi(t), -(HAFTA - 1) * 7), ort = Math.max(30, hedef / 7);
-  let hucre = '';
+  let hucre = '', aylar = '', sonAy = -1;
+  for (let w = 0; w < HAFTA; w++) {
+    const ay = tarih(gunEkle(ilk, w * 7 + 6)).getMonth();
+    aylar += `<span>${ay !== sonAy && w < HAFTA - 1 ? tarih(gunEkle(ilk, w * 7 + 6)).toLocaleDateString('tr-TR', { month: 'short' }) : ''}</span>`;
+    sonAy = ay;
+  }
   for (let i = 0; i < HAFTA * 7; i++) {
     const g = gunEkle(ilk, i);
-    if (g > t) { hucre += `<i style="visibility:hidden"></i>`; continue; }
+    if (g > t) { hucre += `<i class="ileri"></i>`; continue; }
     const dk = gunDk.get(g) || 0, s = !dk ? 0 : dk < ort * .34 ? 1 : dk < ort * .67 ? 2 : dk < ort ? 3 : 4;
-    hucre += `<i class="s${s} ${g === t ? 'bg' : ''}" title="${tarihYaz(g)}: ${sureYaz(dk)}"></i>`;
+    hucre += `<i class="s${s} ${g === t ? 'bg' : ''}" style="--i:${Math.floor(i / 7)}" title="${tarihYaz(g)}: ${sureYaz(dk)}"></i>`;
   }
   const aktif = [...gunDk.keys()].filter(g => g >= ilk).length;
-  h += `<div class="kart"><div class="bas"><b>Son ${HAFTA} hafta</b><span class="soluk kucuk">${seri()} gün seri · ${aktif} aktif gün</span></div>
-    <div class="isi" role="img" aria-label="Son ${HAFTA} haftada ${aktif} gün çalışma kaydı var">${hucre}</div>
+  h += `<div class="kart"><div class="bas"><b>Son ${HAFTA} hafta</b><span class="soluk kucuk">${aktif} aktif gün</span></div>
+    <div class="isikap"><div class="isigun"><span>Pzt</span><span></span><span>Çar</span><span></span><span>Cum</span><span></span><span>Paz</span></div>
+    <div class="orta"><div class="isiay">${aylar}</div>
+    <div class="isi" role="img" aria-label="Son ${HAFTA} haftada ${aktif} gün çalışma kaydı var">${hucre}</div></div></div>
     <div class="lejant">az <i></i><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i> çok</div></div>`;
+
   const dersler = aktifDersler();
   const tum = dersler.flatMap(d => dersKonulari(d.id)), bit = tum.filter(k => k.durum === 'calisildi').length;
   h += `<div class="kart"><div class="bas"><b>${esc(aktifKomite().ad)}</b><span class="sayi soluk kucuk">${bit} / ${tum.length} konu</span></div>
-    <div class="cubuk"><i style="width:${tum.length ? bit / tum.length * 100 : 0}%"></i></div>`;
+    <div class="cubuk"><i style="width:${tum.length ? bit / tum.length * 100 : 0}%"></i></div>
+    <div class="dtablo">`;
   for (const d of dersler) {
     const ks = dersKonulari(d.id), b = ks.filter(k => k.durum === 'calisildi').length;
-    h += `<div class="yatay cub"><span class="ad">${esc(d.ad)}</span><div class="cubuk"><i style="width:${ks.length ? b / ks.length * 100 : 0}%;background:${esc(d.renk)}"></i></div>
-      <span class="soluk sayi">${b}/${ks.length} · %${Algo.dersOzet(S, d.id, t).hazirlik ?? 0}</span></div>`;
+    h += `<span class="ad">${esc(d.ad)}</span><div class="cubuk"><i style="width:${ks.length ? b / ks.length * 100 : 0}%;background:${esc(d.renk)}"></i></div>
+      <span class="sayi soluk">${b}/${ks.length}</span><span class="sayi hz">%${Algo.dersOzet(S, d.id, t).hazirlik ?? 0}</span>`;
   }
-  return h + `<p class="soluk kucuk" style="margin-top:12px">Yüzdeler, konuları bugün ne kadar hatırladığına dair tahmindir.</p></div></div></div>`;
+  return h + `</div>${dersler.length ? `<p class="soluk kucuk" style="margin:14px 0 0">Sağdaki yüzde, o dersin konularını bugün ne kadar hatırladığına dair tahmindir.</p>` : ''}</div></div></div>`;
 }
 
 function gorAyarlar() {
@@ -478,7 +537,7 @@ function gorAyarlar() {
     <p class="soluk kucuk">Android (Chrome): menü › "Ana ekrana ekle" ya da "Uygulamayı yükle". iPhone ve iPad (Safari): Paylaş › "Ana Ekrana Ekle".
     Kurulduktan sonra internet olmadan da açılır.</p></div>
   <div class="kart"><button class="btn tehlike blok" data-a="sifirla">Tüm verileri sil</button></div>
-  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 2.0</p></div></div>`;
+  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 2.1</p></div></div>`;
 }
 
 const GORUNUM = { bugun: gorBugun, dersler: gorDersler, sure: gorSure, ozet: gorOzet, ayarlar: gorAyarlar };
@@ -493,7 +552,10 @@ function ciz() {
     requestAnimationFrame(() => requestAnimationFrame(() => {
       for (const e of document.querySelectorAll('.dolu[data-h]')) e.setAttribute('stroke-dashoffset', e.dataset.h);
     }));
-  }
+    saydir();
+  } else $('#app').classList.remove('gir');
+  const acik = UI.sekme === 'dersler' && dersBul(UI.dersId);
+  $('#ust b').textContent = acik ? acik.ad : { bugun: 'Bugün', dersler: 'Dersler', sure: 'Odak', ozet: 'Özet', ayarlar: 'Ayarlar' }[UI.sekme];
   tik();
 }
 
@@ -514,6 +576,7 @@ function tik() {
   }
 }
 setInterval(tik, 1000);
+addEventListener('scroll', () => $('#ust').classList.toggle('gor', scrollY > 64), { passive: true });
 
 /* ---------- iletişim kutusu ---------- */
 function kutu(baslik, govde, onay, onayYazi = 'Kaydet', vazgecYazi = 'Vazgeç') {
@@ -636,8 +699,17 @@ const A = {
   tekrarEt(el) { puanKutusu(konuBul(el.dataset.id)); },
   puan(el) {
     const k = konuBul(el.dataset.id), gun = Algo.puanla(S, k, el.dataset.p, bugun());
-    $('#dlg').close(); kaydet(); ciz();
-    toast(`Kaydedildi. Sonraki tekrar ${gun} gün sonra.`);
+    $('#dlg').close(); kaydet(); titre(12);
+    const kart = UI.sekme === 'bugun' && [...document.querySelectorAll('.is:not(.kompakt)')].find(li => li.querySelector(`[data-id="${k.id}"]`));
+    const bitir = () => { ciz(); toast(`Kaydedildi. Sonraki tekrar ${gun} gün sonra.`); };
+    if (!kart) return bitir();
+    const r = kart.getBoundingClientRect();
+    kutla(r.right - 40, r.top + r.height / 2, 16);
+    kart.classList.add('bitti');
+    setTimeout(() => {
+      bitir();
+      if (!document.querySelector('.is:not(.kompakt)')) { kutla(innerWidth / 2, innerHeight * .32, 70); titre([20, 60, 20]); }
+    }, azHareket() ? 0 : 430);
   },
   // Bugünün programındaki bir işi sayaçla başlatır.
   calis(el) {
@@ -694,7 +766,7 @@ const A = {
     S.oturumlar = S.oturumlar.filter(o => o.id !== el.dataset.id); kaydet(); ciz();
   },
 
-  hafta(el) { UI.hafta = Math.min(0, UI.hafta + Number(el.dataset.n)); ciz(); },
+  hafta(el) { UI.hafta = Math.min(0, UI.hafta + Number(el.dataset.n)); UI.anim = true; ciz(); },
 
   disaAktar() {
     const a = document.createElement('a');
