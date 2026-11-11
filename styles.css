@@ -444,7 +444,7 @@ dialog::backdrop { background: rgba(4,8,12,.55); backdrop-filter: blur(4px); -we
 #app.gir .yigin { animation: ac .8s cubic-bezier(.2,.8,.2,1) both .2s; }
 @keyframes ac { from { clip-path: inset(0 100% 0 0 round 99px); } to { clip-path: inset(0 0 0 0 round 99px); } }
 #app.gir .noktalar i { animation: hucre .35s both; animation-delay: calc(var(--n, 0) * 12ms + .2s); }
-.is.bitti { animation: bitti .43s cubic-bezier(.4,0,.2,1) forwards; border-color: var(--kolay); }
+.is.bitti { pointer-events: none; animation: bitti .43s cubic-bezier(.4,0,.2,1) forwards; border-color: var(--kolay); }
 @keyframes bitti { 30% { transform: scale(1.02); opacity: 1; } to { transform: translateX(40px) scale(.94); opacity: 0; } }
 .konfeti { position: fixed; z-index: 40; width: 0; height: 0; pointer-events: none; }
 .konfeti i { position: absolute; left: -4px; top: -5px; width: 8px; height: 10px; border-radius: 2px; animation: konfeti 1.15s cubic-bezier(.12,.7,.3,1) both; }
