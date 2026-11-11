@@ -260,7 +260,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .odak .konu div { color: rgba(255,255,255,.65); font-size: .86rem; }
 .odak .alan { width: 100%; max-width: 420px; text-align: left; }
 .odak label { color: rgba(255,255,255,.6); }
-.odak select { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.12); color: #fff; color-scheme: dark; }
+.odak select, .odak input { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.12); color: #fff; color-scheme: dark; }
 .odak .bolme { background: rgba(255,255,255,.07); }
 .odak .bolme button { color: rgba(255,255,255,.6); }
 .odak .bolme button.secili { background: #fff; color: #0a0f16; box-shadow: none; }
@@ -501,3 +501,21 @@ span[data-b] { font: inherit !important; color: inherit !important; opacity: 1 !
   .ozh .buyuk { font-size: 2.15rem; }
   .degisim { border-radius: 14px; }
 }
+
+/* Sürüm 2.2: soru takibi, notlar, Pomodoro */
+.dyb { display: flex; gap: 2px; height: 10px; border-radius: 99px; overflow: hidden; margin: 14px 0 4px; background: var(--iz); }
+.dyb i { display: block; min-width: 0; background: var(--kolay); }
+.dyb i.y { background: var(--zor); } .dyb i.b { background: color-mix(in srgb, var(--soluk) 45%, transparent); }
+.liste.sorul { margin-top: 10px; border-top: 1px solid var(--cizgi); padding-top: 10px; }
+.liste.sorul li { padding: 8px 0; }
+.knot { font-size: .8rem; color: var(--soluk); margin-top: 5px; padding: 6px 10px; border-radius: 10px; background: var(--kart2); border-left: 3px solid var(--vurgu); white-space: pre-wrap; overflow-wrap: anywhere; }
+.odak .knot { background: rgba(255,255,255,.07); color: rgba(255,255,255,.75); text-align: left; max-width: 420px; margin-top: 10px; }
+a.ikon, a.btn { text-decoration: none; }
+a.ikon { color: var(--ana); }
+textarea.kisa { min-height: 84px; }
+.yanyana { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.yanyana.uc { grid-template-columns: repeat(3, 1fr); }
+.bolme.esnek { display: flex; }
+.bolme.esnek button { flex: 1 1 auto; padding: 0 9px; }
+dialog .ucluk div { background: var(--kart2); }
+dialog .dtablo { grid-template-columns: minmax(0, auto) minmax(40px, 1fr) auto auto; }

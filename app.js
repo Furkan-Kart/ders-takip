@@ -58,6 +58,8 @@ const IK = {
   telefon: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>',
   yukari: '<path d="M6 15l6-6 6 6"/>',
   asagi: '<path d="M6 9l6 6 6-6"/>',
+  not: '<path d="M6 4h9l4 4v12H6zM14 4v5h5M9 13h6M9 17h4"/>',
+  bag: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   yuzZor: '<circle cx="12" cy="12" r="9"/><path d="M8.5 16c1-1.6 6-1.6 7 0M9 10h.01M15 10h.01"/>',
   yuzOrta: '<circle cx="12" cy="12" r="9"/><path d="M8.5 15.5h7M9 10h.01M15 10h.01"/>',
   yuzKolay: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 2 6 2 7 0M9 10h.01M15 10h.01"/>'
@@ -111,19 +113,21 @@ function varsayilan() {
     v: 1,
     komiteler: [{ id: kid, ad: '2. Komite' }],
     aktifKomite: kid,
-    dersler: [], konular: [], sinavlar: [], oturumlar: [],
-    ayar: { gunluk: [120, 120, 120, 120, 120, 180, 180], araliklar: [1, 7, 30], tekrarGunu: 1, tema: '' },
+    dersler: [], konular: [], sinavlar: [], oturumlar: [], sorular: [],
+    ayar: { gunluk: [120, 120, 120, 120, 120, 180, 180], araliklar: [1, 7, 30], tekrarGunu: 1, tema: '', pomo: { c: 25, m: 5 } },
     sayac: null
   };
 }
 function duzelt(s) {
   const v = varsayilan();
   if (!s || typeof s !== 'object' || !Array.isArray(s.komiteler)) return v;
-  for (const k of ['dersler', 'konular', 'sinavlar', 'oturumlar']) if (!Array.isArray(s[k])) s[k] = [];
+  for (const k of ['dersler', 'konular', 'sinavlar', 'oturumlar', 'sorular']) if (!Array.isArray(s[k])) s[k] = [];
   for (const k of s.konular) if (!Array.isArray(k.tekrarlar)) k.tekrarlar = [];
   s.ayar = Object.assign(v.ayar, s.ayar || {});
   if (!Array.isArray(s.ayar.gunluk) || s.ayar.gunluk.length !== 7) s.ayar.gunluk = [120, 120, 120, 120, 120, 180, 180];
   if (!Array.isArray(s.ayar.araliklar) || !s.ayar.araliklar.length) s.ayar.araliklar = [1, 7, 30];
+  const pm = s.ayar.pomo || {};
+  s.ayar.pomo = { c: sayi(pm.c, 25, 5, 120), m: sayi(pm.m, 5, 1, 60) };
   if (!s.komiteler.length) s.komiteler = v.komiteler;
   if (!s.komiteler.some(k => k.id === s.aktifKomite)) s.aktifKomite = s.komiteler[0].id;
   if (s.sayac === undefined) s.sayac = null;
@@ -150,6 +154,51 @@ function temaUygula() {
   if (S.ayar.tema) k.dataset.tema = S.ayar.tema; else delete k.dataset.tema;
   const koyu = S.ayar.tema ? S.ayar.tema === 'koyu' : matchMedia('(prefers-color-scheme: dark)').matches;
   $('meta[name=theme-color]').content = koyu ? '#080c11' : '#f5f4f0';
+}
+
+/* ---------- soru kayıtları ---------- */
+function soruOzet(f) {
+  let d = 0, y = 0, b = 0;
+  for (const q of S.sorular) if (f(q)) { d += q.dogru; y += q.yanlis; b += q.bos || 0; }
+  const top = d + y + b;
+  return { d, y, b, top, oran: top ? Math.round(d / top * 100) : null };
+}
+const netYaz = (d, y) => (d - y / 4).toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
+const dybCubuk = o => `<div class="dyb" role="img" aria-label="${o.d} doğru, ${o.y} yanlış, ${o.b} boş">
+  <i style="flex:${o.d}"></i><i class="y" style="flex:${o.y}"></i><i class="b" style="flex:${o.b}"></i></div>`;
+const guvenliUrl = u => /^https?:\/\/\S+$/i.test(u || '') ? u : '';
+// Yapıştırılan listelerdeki madde işaretlerini ve numaraları temizler.
+const satirTemiz = x => x.replace(/^\s*(?:[-•*·–]+|\d+\s*[.)-])\s*/, '').trim();
+function indir(metin, ad, tur) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([metin], { type: tur }));
+  a.download = ad;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+// Takvim dosyası (.ics): tüm gün süren etkinlikler. Aynı etkinlik yeniden aktarılırsa takvimde güncellenir.
+function icsIndir(olaylar, ad) {
+  const kacis = x => String(x).replace(/([\\;,])/g, '\\$1').replace(/\n/g, '\\n');
+  const kat = x => x.match(/.{1,36}/gu).join('\r\n ');
+  const gun = x => x.replace(/-/g, '');
+  const dmg = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+  const st = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ders Takip//TR', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  for (const o of olaylar) {
+    st.push('BEGIN:VEVENT', `UID:${o.uid}@ders-takip`, `DTSTAMP:${dmg}`, `DTSTART;VALUE=DATE:${gun(o.tarih)}`,
+      `DTEND;VALUE=DATE:${gun(gunEkle(o.tarih, 1))}`, kat(`SUMMARY:${kacis(o.baslik)}`));
+    if (o.aciklama) st.push(kat(`DESCRIPTION:${kacis(o.aciklama)}`));
+    if (o.alarm) st.push('BEGIN:VALARM', 'ACTION:DISPLAY', kat(`DESCRIPTION:${kacis(o.baslik)}`), 'TRIGGER:-PT15H', 'END:VALARM');
+    st.push('END:VEVENT');
+  }
+  st.push('END:VCALENDAR');
+  indir(st.join('\r\n') + '\r\n', ad, 'text/calendar;charset=utf-8');
+}
+function bip() {
+  try {
+    const C = new (window.AudioContext || window.webkitAudioContext)(), o = C.createOscillator(), g = C.createGain();
+    o.frequency.value = 880; g.gain.setValueAtTime(.15, C.currentTime); g.gain.exponentialRampToValueAtTime(.001, C.currentTime + .6);
+    o.connect(g); g.connect(C.destination); o.start(); o.stop(C.currentTime + .6); setTimeout(() => C.close(), 900);
+  } catch {}
 }
 
 /* ---------- algoritma köprüsü (asıl mantık algoritma.js içinde) ---------- */
@@ -245,6 +294,10 @@ function gorBugun() {
   sol += g0.isler.length ? `<ul class="isler">${g0.isler.map(i => isKarti(i, true)).join('')}</ul>`
     : bosKart('Bugünlük bu kadar', 'Planlanan işlerin hepsi tamam. İstersen yarının işlerinden birine başlayabilirsin.');
   let sag = `<h2>Program durumu</h2>${durumKarti(p)}`;
+  const gecen = S.sinavlar.filter(x => x.tarih < t && gunFark(x.tarih, t) <= 21 && x.not == null).sort((a, b) => a.tarih < b.tarih ? 1 : -1)[0];
+  if (gecen) sag += `<div class="kart"><div class="bas"><div><b>${esc(gecen.ad)} nasıl geçti?</b>
+    <div class="soluk kucuk">Notunu gir, sonraki komitenin programı buna göre ayarlansın.</div></div>
+    <button class="btn kucuk" data-a="sinavDuzenle" data-id="${gecen.id}">Not gir</button></div></div>`;
   const sonra = p.gunler.slice(1, 15);
   if (sonra.length) {
     if (UI.gun < 1 || UI.gun > sonra.length) UI.gun = 1;
@@ -270,8 +323,9 @@ function sinavListe(liste, duzenle) {
   const t = bugun();
   return `<ul class="liste">${liste.map(s => {
     const g = gunFark(t, s.tarih), kom = S.komiteler.find(k => k.id === s.komiteId);
-    return `<li><div class="gunkutu ${g >= 0 && g <= 7 ? 'yakin' : ''}"><b>${g < 0 ? '–' : g}</b><span>${g < 0 ? 'geçti' : g === 0 ? 'bugün' : 'gün'}</span></div>
+    return `<li><div class="gunkutu ${g >= 0 && g <= 7 ? 'yakin' : ''}"><b>${g < 0 ? (s.not ?? '–') : g}</b><span>${g < 0 ? (s.not != null ? 'not' : 'geçti') : g === 0 ? 'bugün' : 'gün'}</span></div>
       <div class="orta"><div class="ad">${esc(s.ad)}</div><div class="soluk kucuk">${duzenle ? '' : esc(kom ? kom.ad : '') + ' · '}${tarihYaz(s.tarih)}</div></div>
+      ${duzenle && g < 0 ? `<button class="btn kucuk ghost" data-a="sinavAnaliz" data-id="${s.id}">Analiz</button>` : ''}
       ${duzenle ? `<button class="ikon" data-a="sinavDuzenle" data-id="${s.id}" aria-label="Sınavı düzenle">${ik('uc', 1)}</button>` : ''}</li>`;
   }).join('')}</ul>`;
 }
@@ -287,7 +341,8 @@ function gorDersler() {
     `<button class="cip ${k.id === kid ? 'secili' : ''}" data-a="komiteSec" data-id="${k.id}">${esc(k.ad)}</button>`).join('')}
     <button class="cip cizgili" data-a="komiteEkle">+ Komite</button></div>`;
   const dersler = aktifDersler();
-  h += `<div class="bas bolum"><h2>Dersler</h2><button class="btn kucuk" data-a="dersEkle">${ik('arti')} Ders</button></div>`;
+  h += `<div class="bas bolum"><h2>Dersler</h2><div class="sira"><button class="btn kucuk ghost" data-a="topluEkle">Toplu ekle</button>
+    <button class="btn kucuk" data-a="dersEkle">${ik('arti')} Ders</button></div></div>`;
   if (!dersler.length) h += bosKart('Bu komitede henüz ders yok', 'Örneğin Anatomi, Fizyoloji, Biyokimya ekleyebilirsin.');
   h += `<div class="izgara">`;
   for (const d of dersler) {
@@ -313,7 +368,13 @@ function gorDers(d) {
   const biten = tum.filter(k => k.durum === 'calisildi').length;
   const oz = Algo.dersOzet(S, d.id, t), carpan = oz.carpan || 1;
   const vadeli = k => k.durum === 'calisildi' && k.sonrakiTekrar && k.sonrakiTekrar <= t;
-  const FILTRE = { tum: ['Tümü', () => true], yeni: ['Çalışılmadı', k => k.durum !== 'calisildi'], tekrar: ['Tekrar bekleyen', vadeli], zor: ['Zorlandıklarım', k => k.sonPuan === 'zor'] };
+  const sk = new Map();
+  for (const q of S.sorular) if (q.dersId === d.id && q.konuId) {
+    const x = sk.get(q.konuId) || { d: 0, top: 0 };
+    x.d += q.dogru; x.top += q.dogru + q.yanlis + (q.bos || 0); sk.set(q.konuId, x);
+  }
+  const zayif = k => { const x = sk.get(k.id); return !!x && x.top >= 5 && x.d / x.top < .6; };
+  const FILTRE = { tum: ['Tümü', () => true], yeni: ['Çalışılmadı', k => k.durum !== 'calisildi'], tekrar: ['Tekrar bekleyen', vadeli], zor: ['Zorlandıklarım', k => k.sonPuan === 'zor' || zayif(k)] };
   if (!FILTRE[UI.filtre]) UI.filtre = 'tum';
   const ks = tum.filter(FILTRE[UI.filtre][1]);
   let h = `<div class="ustbar"><button class="btn kucuk ghost" data-a="dersKapat">${ik('geri')} Dersler</button>
@@ -326,6 +387,14 @@ function gorDers(d) {
     <div><b>${sureYaz(oz.kalanDk ?? tum.filter(k => k.durum !== 'calisildi').reduce((a, k) => a + tahminDk(k), 0))}</b><span>kalan çalışma</span></div></div></section>`;
   if (Math.abs(carpan - 1) >= 0.08) h += `<p class="soluk kucuk" style="margin:10px 4px 0">Bu derste konular tahmin edilenden ${carpan > 1 ? 'uzun' : 'kısa'} sürüyor;
     program sürelerini ×${carpan.toFixed(1).replace('.', ',')} ile hesaplıyor.</p>`;
+  const so = soruOzet(q => q.dersId === d.id);
+  const sonSoru = S.sorular.filter(q => q.dersId === d.id).sort((a, b) => a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : b.id < a.id ? -1 : 1).slice(0, 4);
+  h += `<div class="kart"><div class="bas"><div><b>Soru çözümü</b><div class="soluk kucuk sayi">${so.top
+    ? `${so.top} soru · %${so.oran} doğru · ${netYaz(so.d, so.y)} net` : 'Çözdüğün soruları kaydet; zayıf çıkan konuların tekrarı öne alınır.'}</div></div>
+    <button class="btn kucuk ghost" data-a="soruEkle" data-id="${d.id}">${ik('arti')} Soru</button></div>${so.top ? dybCubuk(so) : ''}
+    ${sonSoru.length ? `<ul class="liste sorul">${sonSoru.map(q => { const k = konuBul(q.konuId), tp = q.dogru + q.yanlis + (q.bos || 0);
+      return `<li><div class="orta"><div class="ad">${esc(k ? k.ad : 'Genel')}</div><div class="soluk kucuk sayi">${tarihYaz(q.tarih, 'gun')} · ${q.dogru} doğru, ${q.yanlis} yanlış${q.bos ? `, ${q.bos} boş` : ''}</div></div>
+        <b class="sayi">%${Math.round(q.dogru / tp * 100)}</b><button class="ikon" data-a="soruSil" data-id="${q.id}" aria-label="Soru kaydını sil">${ik('carpi')}</button></li>`; }).join('')}</ul>` : ''}</div>`;
   h += `<div class="bas bolum"><h2>Konular</h2><button class="btn kucuk" data-a="konuEkle" data-id="${d.id}">${ik('arti')} Konu</button></div>`;
   if (!tum.length) return h + bosKart('Henüz konu yok', 'Konuları her satıra bir tane yazarak toplu ekleyebilirsin.');
   h += `<div class="cipler">${Object.entries(FILTRE).map(([a, [ad, f]]) =>
@@ -341,20 +410,32 @@ function gorDers(d) {
       alt = `<span class="hbar ${hy < 60 ? 'z' : hy < 80 ? 'o' : ''}" title="Tahmini hatırlama"><u style="width:${hy}%"></u></span><span class="soluk sayi">%${hy} · </span>` +
         (g <= 0 ? `<span class="etiket gecikti">Tekrar zamanı</span>` : `<span class="soluk">Tekrar ${tarihYaz(k.sonrakiTekrar, 'gun')}</span>`);
     }
+    const sq = sk.get(k.id), url = guvenliUrl(k.baglanti);
+    if (sq) alt += `<div class="soluk sayi" style="margin-top:2px">${sq.top} soru · %${Math.round(sq.d / sq.top * 100)} doğru</div>`;
+    if (k.not) alt += `<div class="knot">${esc(k.not)}</div>`;
     return `<li data-ad="${esc(k.ad.toLocaleLowerCase('tr'))}"><button class="durum ${tamam ? 'tamam' : ''}" data-a="${tamam ? 'tekrarEt' : 'calistim'}" data-id="${k.id}"
       aria-label="${tamam ? 'Tekrar ettim' : 'Çalıştım'}">${tamam ? ik('tik') : ''}</button>
       <div class="orta"><div class="ad">${esc(k.ad)}</div><div class="kucuk" style="margin-top:2px">${alt}</div></div>
+      ${url ? `<a class="ikon" href="${esc(url)}" target="_blank" rel="noopener noreferrer" aria-label="Bağlantıyı aç" title="Bağlantıyı aç">${ik('bag')}</a>` : ''}
       <button class="ikon" data-a="konuDuzenle" data-id="${k.id}" aria-label="Konuyu düzenle">${ik('uc', 1)}</button></li>`;
   }).join('')}</ul>`;
   return h + `</div>`;
 }
 
 function sayacSn() { return S.sayac ? Math.max(0, Math.floor((Date.now() - S.sayac.basla) / 1000)) : 0; }
+// Pomodoro: evre, başlangıçtan beri geçen süreden hesaplanır; uygulama kapalıyken de doğru kalır.
+function pomo() {
+  const c = S.sayac, P = c && c.pomo;
+  if (!P) return null;
+  const sn = sayacSn(), cal = P.c * 60, mol = P.m * 60, dng = cal + mol, tur = Math.floor(sn / dng), r = sn % dng, mola = r >= cal;
+  return { tur: tur + 1, mola, kalan: mola ? dng - r : cal - r, oran: mola ? (r - cal) / mol : r / cal, calisSn: tur * cal + Math.min(r, cal) };
+}
+const pomoAlt = p => p.mola ? 'mola · sonra ' + (p.tur + 1) + '. tur' : p.tur + '. tur · çalışma';
 function sayacYazi() {
-  const sn = sayacSn();
+  const p = pomo(), sn = p ? p.kalan : sayacSn();
   return `${sn >= 3600 ? pad(Math.floor(sn / 3600)) + ':' : ''}${pad(Math.floor(sn / 60) % 60)}:${pad(sn % 60)}`;
 }
-const sayacOran = () => !S.sayac ? 0 : S.sayac.hedef ? sayacSn() / (S.sayac.hedef * 60) : (sayacSn() % 3600) / 3600;
+const sayacOran = () => { const p = pomo(); return !S.sayac ? 0 : p ? p.oran : S.sayac.hedef ? sayacSn() / (S.sayac.hedef * 60) : (sayacSn() % 3600) / 3600; };
 // Sayaç çemberi: dışta dakika çizgileri, içte ilerleme halkası.
 function sayacHalka(oran, renk, ic) {
   const B = 252, r = 102, c = 2 * Math.PI * r, rc = 122, cc = 2 * Math.PI * rc, o = Math.min(1, Math.max(0, oran || 0));
@@ -383,19 +464,23 @@ function gorSure() {
   const c = S.sayac;
   if (!dersBul(UI.sDers)) { UI.sDers = (aktifDersler()[0] || S.dersler[0]).id; UI.sKonu = ''; }
   if (c) {
-    const d = dersBul(c.dersId), k = konuBul(c.konuId), renk = d ? d.renk : '#2dd4bf';
+    const d = dersBul(c.dersId), k = konuBul(c.konuId), renk = d ? d.renk : '#2dd4bf', pm = pomo(), kurl = k && guvenliUrl(k.baglanti);
     h += `<section class="odak" style="--renk:${esc(renk)}">${sayacHalka(sayacOran(), esc(renk),
-      `<div class="zaman" id="zaman">${sayacYazi()}</div><small>${c.hedef ? `hedef ${c.hedef} dk` : 'serbest çalışma'}</small>`)}
-      <div class="konu"><b>${esc(d ? d.ad : 'Silinmiş ders')}</b>${k ? `<div>${esc(k.ad)}</div>` : ''}</div>
+      `<div class="zaman" id="zaman">${sayacYazi()}</div><small id="zalt">${pm ? pomoAlt(pm) : c.hedef ? `hedef ${c.hedef} dk` : 'serbest çalışma'}</small>`)}
+      <div class="konu"><b>${esc(d ? d.ad : 'Silinmiş ders')}</b>${k ? `<div>${esc(k.ad)}</div>` : ''}
+      ${k && k.not ? `<div class="knot">${esc(k.not)}</div>` : ''}
+      ${kurl ? `<a class="btn ghost kucuk" style="margin-top:10px" href="${esc(kurl)}" target="_blank" rel="noopener noreferrer">${ik('bag')} Kaynağı aç</a>` : ''}</div>
       <div class="sira" style="justify-content:center"><button class="btn" data-a="sayacDur">${ik('tik')} Bitir ve kaydet</button>
       <button class="btn ghost" data-a="sayacIptal">Vazgeç</button></div>
       <p class="not">Uygulamayı kapatsan da sayaç çalışmaya devam eder.</p></section>`;
   } else {
-    const d = dersBul(UI.sDers);
+    const d = dersBul(UI.sDers), P = UI.sHedef === 'p', pa = S.ayar.pomo;
     h += `<section class="odak" style="--renk:${esc(d.renk)}">${sayacHalka(0, esc(d.renk),
-      `<div class="zaman">${UI.sHedef ? pad(UI.sHedef) + ':00' : '00:00'}</div><small>${UI.sHedef ? 'hedef süre' : 'serbest çalışma'}</small>`)}
-      <div class="alan"><div class="bolme" role="group" aria-label="Hedef süre">${[[0, 'Serbest'], [25, '25 dk'], [50, '50 dk'], [90, '90 dk']].map(([v, ad]) =>
+      `<div class="zaman">${P ? pad(pa.c) + ':00' : UI.sHedef ? pad(UI.sHedef) + ':00' : '00:00'}</div><small>${P ? `${pa.c} dk çalışma · ${pa.m} dk mola` : UI.sHedef ? 'hedef süre (dk)' : 'serbest çalışma'}</small>`)}
+      <div class="alan"><div class="bolme esnek" role="group" aria-label="Hedef süre">${[[0, 'Serbest'], [25, '25'], [50, '50'], [90, '90'], ['p', 'Pomodoro']].map(([v, ad]) =>
         `<button class="${UI.sHedef === v ? 'secili' : ''}" data-a="hedefSec" data-v="${v}">${ad}</button>`).join('')}</div>
+      ${P ? `<div class="yanyana"><div><label for="pc">Çalışma (dk)</label><input id="pc" type="number" inputmode="numeric" min="5" max="120" value="${pa.c}" data-d="pomoC"></div>
+        <div><label for="pmo">Mola (dk)</label><input id="pmo" type="number" inputmode="numeric" min="1" max="60" value="${pa.m}" data-d="pomoM"></div></div>` : ''}
       <label for="sDers">Ders</label><select id="sDers" data-d="sDers">${dersSecenek(UI.sDers)}</select>
       <label for="sKonu">Konu</label><select id="sKonu" data-d="sKonu">${konuSecenek(UI.sDers, UI.sKonu)}</select></div>
       <div class="sira" style="justify-content:center;margin-top:4px"><button class="btn" data-a="sayacBasla">${ik('oynat', 1)} Başlat</button>
@@ -475,6 +560,17 @@ function gorOzet() {
     h += `<div class="yatay"><span class="nokta" style="background:${esc(dersi(id).renk)}"></span><span class="ad">${esc(dersi(id).ad)}</span>
       <span class="sayi"><b>${sureYaz(dk)}</b> <span class="soluk">%${Math.round(dk / toplam * 100)}</span></span></div>`;
   }
+  const sw = soruOzet(q => q.tarih >= bas && q.tarih <= son);
+  h += `</div><div class="kart"><div class="bas"><b>Sorular</b>${sw.top ? `<span class="soluk kucuk sayi">${sw.top} soru · ${netYaz(sw.d, sw.y)} net</span>` : ''}</div>`;
+  if (!sw.top) h += `<div class="soluk" style="text-align:center;padding:18px 0 6px">Bu hafta soru kaydı yok.</div>`;
+  else {
+    h += dybCubuk(sw);
+    for (const id of new Set(S.sorular.filter(q => q.tarih >= bas && q.tarih <= son).map(q => q.dersId))) {
+      const o = soruOzet(q => q.dersId === id && q.tarih >= bas && q.tarih <= son);
+      h += `<div class="yatay"><span class="nokta" style="background:${esc(dersi(id).renk)}"></span><span class="ad">${esc(dersi(id).ad)}</span>
+        <span class="sayi"><b>%${o.oran}</b> <span class="soluk">${o.top} soru</span></span></div>`;
+    }
+  }
   h += `</div></div><div>`;
 
   // Son 16 haftanın ısı haritası (sütun = hafta, satır = gün)
@@ -533,11 +629,15 @@ function gorAyarlar() {
     <div class="sira" style="margin-top:12px"><button class="btn" data-a="disaAktar">Yedeği indir</button>
     <button class="btn ghost" data-a="iceAktar">Geri yükle</button></div>
     <input type="file" id="dosya" accept="application/json,.json" hidden></div>
+  <div class="kart">${bas('takvim', 'Takvime aktar')}
+    <p class="soluk kucuk">Sınavlarını ve önümüzdeki 14 günün programını telefonunun takvimine ekler. İnen dosyayı açman yeterli; yeniden aktarırsan eski kayıtlar güncellenir.</p>
+    <div class="sira" style="margin-top:12px"><button class="btn" data-a="takvimSinav">Sınavlar</button>
+    <button class="btn ghost" data-a="takvimPlan">14 günlük program</button></div></div>
   <div class="kart">${bas('telefon', 'Telefona kurulum')}
     <p class="soluk kucuk">Android (Chrome): menü › "Ana ekrana ekle" ya da "Uygulamayı yükle". iPhone ve iPad (Safari): Paylaş › "Ana Ekrana Ekle".
     Kurulduktan sonra internet olmadan da açılır.</p></div>
   <div class="kart"><button class="btn tehlike blok" data-a="sifirla">Tüm verileri sil</button></div>
-  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 2.1</p></div></div>`;
+  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 2.2</p></div></div>`;
 }
 
 const GORUNUM = { bugun: gorBugun, dersler: gorDersler, sure: gorSure, ozet: gorOzet, ayarlar: gorAyarlar };
@@ -563,9 +663,18 @@ function ciz() {
 function tik() {
   const mini = $('#mini'), c = S.sayac;
   if (!c) { mini.hidden = true; return; }
-  const yazi = sayacYazi(), d = dersBul(c.dersId);
+  const yazi = sayacYazi(), d = dersBul(c.dersId), pm = pomo();
   mini.hidden = UI.sekme === 'sure';
-  mini.textContent = `${yazi} · ${d ? d.ad : ''}`;
+  mini.textContent = `${yazi} · ${pm && pm.mola ? 'Mola' : d ? d.ad : ''}`;
+  if (pm) {
+    const faz = c.basla + ':' + pm.tur + (pm.mola ? 'm' : 'c'), za = $('#zalt');
+    if (za) za.textContent = pomoAlt(pm);
+    if (tik.faz && tik.faz !== faz && tik.faz.startsWith(c.basla + ':')) {
+      bip(); titre([200, 100, 200]);
+      toast(pm.mola ? `Mola zamanı: ${c.pomo.m} dk dinlen.` : `Mola bitti. ${pm.tur}. tur başladı.`);
+    }
+    tik.faz = faz;
+  }
   const z = $('#zaman'), hl = $('#zhalka');
   if (z) z.textContent = yazi;
   if (hl) hl.setAttribute('stroke-dashoffset', hl.dataset.c * (1 - Math.min(1, sayacOran())));
@@ -667,8 +776,9 @@ const A = {
   konuEkle(el) {
     kutu('Konu ekle', `<label for="fk">Her satıra bir konu yaz</label>
       <textarea id="fk" name="konular" required placeholder="Hücre zarı&#10;Membran potansiyeli&#10;Aksiyon potansiyeli"></textarea>`, v => {
-      const adlar = v.konular.split('\n').map(s => s.trim()).filter(Boolean);
-      if (!adlar.length) return false;
+      const var_ = new Set(dersKonulari(el.dataset.id).map(k => k.ad.toLocaleLowerCase('tr')));
+      const adlar = [...new Set(v.konular.split('\n').map(satirTemiz).filter(Boolean))].filter(a => !var_.has(a.toLocaleLowerCase('tr')));
+      if (!adlar.length) { toast('Eklenecek yeni konu yok.'); return false; }
       for (const ad of adlar) S.konular.push({ id: uid(), dersId: el.dataset.id, ad, durum: 'yeni', tekrarlar: [] });
       toast(`${adlar.length} konu eklendi`);
     }, 'Ekle');
@@ -678,15 +788,21 @@ const A = {
     kutu('Konuyu düzenle', `<label for="fa">Konu adı</label><input id="fa" name="ad" required value="${esc(k.ad)}">
       <label for="ft">Tahmini süre (dk) · boş bırakırsan otomatik hesaplanır</label>
       <input id="ft" name="tahmin" type="number" inputmode="numeric" min="5" max="600" step="5" value="${k.tahmin || ''}">
+      <label for="fn">Not</label><textarea id="fn" name="not" class="kisa" maxlength="600" placeholder="Örn. Slayt 12-30, hocanın vurguladığı yerler">${esc(k.not || '')}</textarea>
+      <label for="fb">Bağlantı (slayt, video, kaynak)</label><input id="fb" name="baglanti" type="text" inputmode="url" autocapitalize="off" placeholder="https://" value="${esc(k.baglanti || '')}">
       <div class="sira" style="margin-top:14px">${k.durum === 'calisildi' ? `<button type="button" class="btn ghost kucuk" data-a="konuSifirla" data-id="${k.id}">Çalışılmadı yap</button>` : ''}
       <button type="button" class="btn tehlike kucuk" data-a="konuSil" data-id="${k.id}">Konuyu sil</button></div>`, v => {
       if (!v.ad.trim()) return false;
       k.ad = v.ad.trim(); k.tahmin = v.tahmin ? sayi(v.tahmin, 0, 5, 600) : undefined;
+      let url = (v.baglanti || '').trim();
+      if (url && !/^[a-z][a-z0-9+.-]*:/i.test(url)) url = 'https://' + url;
+      if (url && !guvenliUrl(url)) { toast('Bağlantı http ya da https ile başlamalı.'); return false; }
+      k.not = (v.not || '').trim() || undefined; k.baglanti = url || undefined;
     });
   },
   konuSifirla(el) {
     const k = konuBul(el.dataset.id), yeni = { id: k.id, dersId: k.dersId, ad: k.ad, durum: 'yeni', tekrarlar: [] };
-    if (k.tahmin) yeni.tahmin = k.tahmin;
+    for (const a of ['tahmin', 'not', 'baglanti']) if (k[a]) yeni[a] = k[a];
     S.konular[S.konular.indexOf(k)] = yeni; // algoritmanın eklediği tüm alanlar da temizlenir
     $('#dlg').close(); kaydet(); ciz();
   },
@@ -694,6 +810,49 @@ const A = {
     if (!confirm('Bu konu silinsin mi?')) return;
     S.konular = S.konular.filter(k => k.id !== el.dataset.id);
     $('#dlg').close(); kaydet(); ciz();
+  },
+  topluEkle() {
+    kutu('Toplu ekle', `<label for="fk">Ders adının sonuna iki nokta koy, altına konularını yaz. Not uygulamasından ya da ders programından yapıştırabilirsin.</label>
+      <textarea id="fk" name="metin" required placeholder="Anatomi:&#10;Omuz eklemi&#10;Brakiyal pleksus&#10;&#10;Fizyoloji:&#10;Membran potansiyeli"></textarea>`, v => {
+      let ders = null, nd = 0, nk = 0;
+      const plan = [];
+      for (const ham of v.metin.split('\n')) {
+        const x = ham.trim();
+        if (!x) continue;
+        if (/^#|[:：]$/.test(x)) { ders = satirTemiz(x.replace(/^#+\s*/, '').replace(/[:：]$/, '')); if (ders) plan.push([ders, []]); else ders = null; continue; }
+        if (!ders) { toast('İlk satır bir ders adı olmalı, örneğin "Anatomi:".'); return false; }
+        const ad = satirTemiz(x); if (ad) plan[plan.length - 1][1].push(ad);
+      }
+      if (!plan.length) return false;
+      for (const [ad, konular] of plan) {
+        let d = aktifDersler().find(z => z.ad.toLocaleLowerCase('tr') === ad.toLocaleLowerCase('tr'));
+        if (!d) { d = { id: uid(), komiteId: S.aktifKomite, ad, zorluk: 3, renk: RENKLER[aktifDersler().length % RENKLER.length] }; S.dersler.push(d); nd++; }
+        const var_ = new Set(dersKonulari(d.id).map(k => k.ad.toLocaleLowerCase('tr')));
+        for (const k of konular) if (!var_.has(k.toLocaleLowerCase('tr'))) { var_.add(k.toLocaleLowerCase('tr')); S.konular.push({ id: uid(), dersId: d.id, ad: k, durum: 'yeni', tekrarlar: [] }); nk++; }
+      }
+      toast(`${nd ? nd + ' ders, ' : ''}${nk} konu eklendi`);
+    }, 'Ekle');
+  },
+  soruEkle(el) {
+    const dersId = el.dataset.id;
+    kutu('Soru kaydı', `<label for="fk">Konu</label><select id="fk" name="konu">${konuSecenek(dersId, el.dataset.konu || '').replace('Konu belirtme', 'Genel (konu belirtme)')}</select>
+      <div class="yanyana uc"><div><label for="fd1">Doğru</label><input id="fd1" name="dogru" type="number" inputmode="numeric" min="0" max="999" required></div>
+      <div><label for="fy">Yanlış</label><input id="fy" name="yanlis" type="number" inputmode="numeric" min="0" max="999" value="0"></div>
+      <div><label for="fbo">Boş</label><input id="fbo" name="bos" type="number" inputmode="numeric" min="0" max="999" value="0"></div></div>
+      <label for="fd">Tarih</label><input id="fd" name="tarih" type="date" required value="${bugun()}" max="${bugun()}">`, v => {
+      const dogru = sayi(v.dogru, 0, 0, 999), yanlis = sayi(v.yanlis, 0, 0, 999), bos = sayi(v.bos, 0, 0, 999), top = dogru + yanlis + bos;
+      if (!top || !v.tarih) return false;
+      S.sorular.push({ id: uid(), tarih: v.tarih, dersId, konuId: v.konu || null, dogru, yanlis, bos });
+      // Doğruluk düşükse konunun tekrarı öne alınır.
+      const k = konuBul(v.konu), yarin = gunEkle(bugun(), 1);
+      if (k && k.durum === 'calisildi' && top >= 5 && dogru / top < .6 && (!k.sonrakiTekrar || k.sonrakiTekrar > yarin)) {
+        k.sonrakiTekrar = yarin; toast('Doğruluk düşük çıktı: bu konunun tekrarı yarına alındı.');
+      } else toast(`${top} soru kaydedildi.`);
+    });
+  },
+  soruSil(el) {
+    if (!confirm('Bu soru kaydı silinsin mi?')) return;
+    S.sorular = S.sorular.filter(q => q.id !== el.dataset.id); kaydet(); ciz();
   },
   calistim(el) { puanKutusu(konuBul(el.dataset.id)); },
   tekrarEt(el) { puanKutusu(konuBul(el.dataset.id)); },
@@ -730,19 +889,80 @@ const A = {
     const s = S.sinavlar.find(x => x.id === el.dataset.id);
     kutu('Sınavı düzenle', `<label for="fa">Sınav adı</label><input id="fa" name="ad" required value="${esc(s.ad)}">
       <label for="fd">Tarih</label><input id="fd" name="tarih" type="date" required value="${s.tarih}">
+      ${s.tarih <= bugun() ? `<label for="fno">Aldığın not (100 üzerinden)</label>
+        <input id="fno" name="not" type="number" inputmode="numeric" min="0" max="100" value="${s.not ?? ''}" placeholder="Açıklanınca gir">` : ''}
       <p><button type="button" class="btn tehlike kucuk" data-a="sinavSil" data-id="${s.id}">Sınavı sil</button></p>`, v => {
       if (!v.ad.trim() || !v.tarih) return false; s.ad = v.ad.trim(); s.tarih = v.tarih;
+      const once = s.not;
+      s.not = v.not === undefined || v.not === '' ? undefined : sayi(v.not, 0, 0, 100);
+      if (s.not != null && s.not !== once) { s.ayarlandi = false; setTimeout(() => A.sinavAnaliz({ dataset: { id: s.id } }), 0); }
     });
+  },
+  // Sınav sonrası analiz: o sınava kadar yapılanların dökümü ve nota göre tempo önerisi.
+  sinavAnaliz(el) {
+    const s = S.sinavlar.find(x => x.id === el.dataset.id);
+    if (!s) return;
+    const ds = S.dersler.filter(d => d.komiteId === s.komiteId), idler = new Set(ds.map(d => d.id));
+    const ks = S.konular.filter(k => idler.has(k.dersId));
+    const biten = ks.filter(k => k.calisildiTarih && k.calisildiTarih <= s.tarih).length;
+    const tekrar = ks.reduce((a, k) => a + (k.tekrarlar || []).filter(r => r.tarih <= s.tarih).length, 0);
+    const dk = S.oturumlar.reduce((a, o) => a + (idler.has(o.dersId) && o.tarih <= s.tarih ? o.dk : 0), 0);
+    const so = soruOzet(q => idler.has(q.dersId) && q.tarih <= s.tarih);
+    const oran = ks.length ? Math.round(biten / ks.length * 100) : 0, tk = biten ? tekrar / biten : 0;
+    const bulgu = [];
+    if (ks.length && oran < 90) bulgu.push(`Konuların %${100 - oran} kadarı sınava kadar çalışılmadı. Günlük hedefi biraz yükseltmek ya da komiteye daha erken başlamak en büyük farkı yaratır.`);
+    if (biten && tk < 1) bulgu.push(`Çalıştığın konu başına ortalama ${tk.toFixed(1).replace('.', ',')} tekrar yaptın. Her konuyu sınavdan önce en az bir kez tekrar etmek hatırlamayı belirgin artırır.`);
+    if (so.top >= 20 && so.oran < 65) bulgu.push(`Soru doğruluğun %${so.oran}. Zorlandığın konulara soru çözerek geri dönmek işe yarar.`);
+    if (!so.top) bulgu.push('Bu komitede soru kaydı yok. Soru çözümünü kaydedersen zayıf konular daha erken ortaya çıkar.');
+    let karar = 'Notunu girince tempo önerisi burada çıkar.', dugme = '';
+    if (s.not != null) {
+      if (s.not < 60) { karar = 'Bu tempo istediğin sonucu vermedi. Sonraki komitede tekrarları sıklaştırmanı öneririm.'; dugme = ['0.8', 'Tekrarları sıklaştır']; }
+      else if (s.not < 85) { karar = 'Sonuç iyi. Biraz daha sık tekrar notu yukarı taşıyabilir; istersen aynı tempoda da kalabilirsin.'; dugme = ['0.9', 'Tekrarları biraz sıklaştır']; }
+      else { karar = 'Tempon işe yarıyor. Tekrarları biraz seyreltip yeni konulara daha çok zaman ayırabilirsin.'; dugme = ['1.15', 'Tekrarları biraz seyrelt']; }
+    }
+    kutu(`${s.ad} analizi`, `<p class="soluk" style="margin:-8px 0 14px">${esc((S.komiteler.find(k => k.id === s.komiteId) || {}).ad || '')} · ${tarihYaz(s.tarih)}</p>
+      <div class="ucluk" style="margin-top:0"><div><b>${s.not ?? '–'}</b><span>not</span></div><div><b>${sureYaz(dk)}</b><span>çalışma</span></div><div><b>%${oran}</b><span>konu bitti</span></div></div>
+      <div class="ucluk" style="margin-top:8px"><div><b>${tekrar}</b><span>tekrar</span></div><div><b>${so.top}</b><span>soru</span></div><div><b>${so.oran === null ? '–' : '%' + so.oran}</b><span>doğruluk</span></div></div>
+      <div class="dtablo" style="margin-top:16px">${ds.map(d => { const dk2 = dersKonulari(d.id), b = dk2.filter(k => k.calisildiTarih && k.calisildiTarih <= s.tarih).length;
+        const sure = S.oturumlar.reduce((a, o) => a + (o.dersId === d.id && o.tarih <= s.tarih ? o.dk : 0), 0);
+        return `<span class="ad">${esc(d.ad)}</span><div class="cubuk"><i style="width:${dk2.length ? b / dk2.length * 100 : 0}%;background:${esc(d.renk)}"></i></div>
+          <span class="sayi soluk">${b}/${dk2.length}</span><span class="sayi soluk">${sureYaz(sure)}</span>`; }).join('')}</div>
+      <ul class="oneri"><li>${ik('hedef')}<span><b>${esc(karar)}</b></span></li>${bulgu.map(x => `<li>${ik('ampul')}<span>${esc(x)}</span></li>`).join('')}</ul>
+      ${dugme && !s.ayarlandi ? `<p style="margin:14px 0 0"><button type="button" class="btn blok" data-a="aralikOlcek" data-id="${s.id}" data-k="${dugme[0]}">${dugme[1]}</button></p>
+        <p class="soluk kucuk">Şu anki tekrar aralığı tercihin: ${S.ayar.araliklar.join(', ')} gün.</p>` : ''}
+      ${s.ayarlandi ? `<p class="soluk kucuk" style="margin-top:14px">Tekrar aralıkları bu sınava göre ayarlandı: ${S.ayar.araliklar.join(', ')} gün.</p>` : ''}`,
+      null, '', 'Kapat');
+  },
+  aralikOlcek(el) {
+    const s = S.sinavlar.find(x => x.id === el.dataset.id), k = Number(el.dataset.k);
+    S.ayar.araliklar = [...new Set(S.ayar.araliklar.map(x => Math.max(1, Math.round(x * k))))];
+    if (s) s.ayarlandi = true;
+    $('#dlg').close(); kaydet(); ciz(); toast(`Tekrar aralıkları güncellendi: ${S.ayar.araliklar.join(', ')} gün.`);
+  },
+  takvimSinav() {
+    const t = bugun(), liste = S.sinavlar.filter(x => x.tarih >= t);
+    if (!liste.length) return toast('Yaklaşan sınav yok.');
+    icsIndir(liste.map(x => ({ uid: 'sinav-' + x.id, tarih: x.tarih, alarm: 1,
+      baslik: `${(S.komiteler.find(k => k.id === x.komiteId) || {}).ad || ''} ${x.ad}`.trim() })), 'ders-takip-sinavlar.ics');
+  },
+  takvimPlan() {
+    const gunler = planla().gunler.slice(0, 14).filter(g => g.isler.length);
+    if (!gunler.length) return toast('Aktarılacak program yok.');
+    icsIndir(gunler.map(g => ({ uid: 'plan-' + g.tarih, tarih: g.tarih,
+      baslik: `Ders çalışma: ${g.isler.length} iş · ${sureYaz(g.isler.reduce((a, i) => a + i.dk, 0))}`,
+      aciklama: g.isler.map(i => `• ${(dersBul(i.konu.dersId) || {}).ad || ''}: ${i.konu.ad} (${i.dk} dk${i.tip === 'yeni' ? '' : ', tekrar'})`).join('\n') })), 'ders-takip-program.ics');
   },
   sinavSil(el) { S.sinavlar = S.sinavlar.filter(s => s.id !== el.dataset.id); $('#dlg').close(); kaydet(); ciz(); },
 
-  hedefSec(el) { UI.sHedef = Number(el.dataset.v); ciz(); },
+  hedefSec(el) { UI.sHedef = el.dataset.v === 'p' ? 'p' : Number(el.dataset.v); ciz(); },
   sayacBasla() {
-    S.sayac = { basla: Date.now(), dersId: UI.sDers, konuId: UI.sKonu || null, hedef: UI.sHedef };
+    const P = UI.sHedef === 'p';
+    S.sayac = { basla: Date.now(), dersId: UI.sDers, konuId: UI.sKonu || null, hedef: P ? 0 : UI.sHedef };
+    if (P) S.sayac.pomo = { ...S.ayar.pomo };
     kaydet(); ciz();
   },
   sayacDur() {
-    const c = S.sayac, dk = Math.round((Date.now() - c.basla) / 60000);
+    const c = S.sayac, pm = pomo(), dk = Math.round((pm ? pm.calisSn : sayacSn()) / 60);
     S.sayac = null;
     if (dk < 1) toast('1 dakikadan kısa olduğu için kaydedilmedi.');
     else { S.oturumlar.push({ id: uid(), tarih: bugun(), dersId: c.dersId, konuId: c.konuId, dk }); toast(`${sureYaz(dk)} kaydedildi.`); }
@@ -769,11 +989,7 @@ const A = {
   hafta(el) { UI.hafta = Math.min(0, UI.hafta + Number(el.dataset.n)); UI.anim = true; ciz(); },
 
   disaAktar() {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }));
-    a.download = `ders-takip-yedek-${bugun()}.json`;
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    indir(JSON.stringify(S, null, 1), `ders-takip-yedek-${bugun()}.json`, 'application/json');
   },
   iceAktar() { $('#dosya').click(); },
   sifirla() {
@@ -810,6 +1026,10 @@ document.addEventListener('change', e => {
   if (!d) return;
   if (d === 'sDers') { UI.sDers = el.value; UI.sKonu = ''; ciz(); return; }
   if (d === 'sKonu') { UI.sKonu = el.value; return; }
+  if (d === 'pomoC' || d === 'pomoM') {
+    if (d === 'pomoC') S.ayar.pomo.c = sayi(el.value, 25, 5, 120); else S.ayar.pomo.m = sayi(el.value, 5, 1, 60);
+    kaydet(); ciz(); return;
+  }
   if (d === 'gunluk') S.ayar.gunluk[Number(el.dataset.i)] = sayi(el.value, 0, 0, 900);
   if (d === 'tekrarGunu') S.ayar.tekrarGunu = sayi(el.value, 1, 0, 14);
   if (d === 'araliklar') {

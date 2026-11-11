@@ -1,5 +1,5 @@
 // Çevrimdışı çalışma: dosyalar önbellekten sunulur, bağlantı varsa arka planda güncellenir.
-const ONBELLEK = 'ders-takip-v5';
+const ONBELLEK = 'ders-takip-v6';
 const DOSYALAR = [
   './', 'index.html', 'styles.css', 'algoritma.js', 'app.js', 'manifest.webmanifest', 'fonts/jakarta-latin.woff2', 'fonts/jakarta-latin-ext.woff2',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'
