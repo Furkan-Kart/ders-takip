@@ -60,6 +60,10 @@ const IK = {
   asagi: '<path d="M6 9l6 6 6-6"/>',
   not: '<path d="M6 4h9l4 4v12H6zM14 4v5h5M9 13h6M9 17h4"/>',
   bag: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  pdf: '<path d="M6 3h8l5 5v13H6zM14 3v5h5"/><path d="M9 13h1.5a1.5 1.5 0 0 1 0 3H9v-3zm0 3v2M14 13v5M14 13h2.5M14 15.5h2"/>',
+  arti2: '<path d="M12 7v10M7 12h10"/><circle cx="12" cy="12" r="9"/>',
+  dis: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  eksi: '<path d="M6 12h12"/>',
   yuzZor: '<circle cx="12" cy="12" r="9"/><path d="M8.5 16c1-1.6 6-1.6 7 0M9 10h.01M15 10h.01"/>',
   yuzOrta: '<circle cx="12" cy="12" r="9"/><path d="M8.5 15.5h7M9 10h.01M15 10h.01"/>',
   yuzKolay: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 2 6 2 7 0M9 10h.01M15 10h.01"/>'
@@ -199,6 +203,153 @@ function bip() {
     o.connect(g); g.connect(C.destination); o.start(); o.stop(C.currentTime + .6); setTimeout(() => C.close(), 900);
   } catch {}
 }
+
+/* ---------- PDF'ler: cihazda IndexedDB'de saklanır, uygulama içinde açılır ---------- */
+const MB = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + ' KB' : (n / 1048576).toFixed(n < 10485760 ? 1 : 0).replace('.', ',') + ' MB';
+const Pdf = {
+  db: null,
+  ac() {
+    if (this.db) return this.db;
+    return this.db = new Promise((ok, hata) => {
+      const r = indexedDB.open('dersTakip', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('pdf', { keyPath: 'id' });
+      r.onsuccess = () => ok(r.result);
+      r.onerror = () => { this.db = null; hata(r.error); };
+    });
+  },
+  async is(mod, f) {
+    const db = await this.ac();
+    return new Promise((ok, hata) => {
+      const tx = db.transaction('pdf', mod), st = tx.objectStore('pdf'), r = f(st);
+      tx.oncomplete = () => ok(r && r.result);
+      tx.onerror = tx.onabort = () => hata(tx.error);
+    });
+  },
+  al: id => Pdf.is('readonly', st => st.get(id)),
+  koy: kayit => Pdf.is('readwrite', st => st.put(kayit)),
+  anahtarlar: () => Pdf.is('readonly', st => st.getAllKeys()),
+  // Hiçbir konuya bağlı olmayan dosyaları siler (konu, ders ya da komite silinince).
+  async temizle() {
+    try {
+      const kullan = new Set(S.konular.flatMap(k => (k.pdfler || []).map(p => p.id)));
+      const sil = (await Pdf.anahtarlar()).filter(id => !kullan.has(id));
+      if (sil.length) await Pdf.is('readwrite', st => { for (const id of sil) st.delete(id); });
+    } catch {}
+  }
+};
+const pdfToplam = () => S.konular.reduce((a, k) => a + (k.pdfler || []).reduce((b, p) => b + (p.boyut || 0), 0), 0);
+const pdfSayisi = () => S.konular.reduce((a, k) => a + (k.pdfler || []).length, 0);
+async function pdfEkleDosya(k, dosyalar) {
+  let n = 0;
+  for (const f of dosyalar) {
+    if (f.type !== 'application/pdf' && !/\.pdf$/i.test(f.name)) { toast(`${f.name} bir PDF değil.`); continue; }
+    try {
+      if (navigator.storage && navigator.storage.estimate) {
+        const e = await navigator.storage.estimate();
+        if (e.quota && e.usage + f.size > e.quota * .95) { toast('Cihazda bu PDF için yer kalmadı.'); break; }
+      }
+      const id = uid();
+      await Pdf.koy({ id, ad: f.name, tur: 'application/pdf', blob: f });
+      (k.pdfler = k.pdfler || []).push({ id, ad: f.name.replace(/\.pdf$/i, ''), boyut: f.size });
+      n++;
+    } catch (e) { toast(e && e.name === 'QuotaExceededError' ? 'Cihazda bu PDF için yer kalmadı.' : 'PDF kaydedilemedi.'); break; }
+  }
+  if (n) { kaydet(); toast(`${n} PDF eklendi`); }
+  return n;
+}
+const pdfListe = k => (k.pdfler || []).length ? `<ul class="liste pdfl">${k.pdfler.map(p => `<li>
+  <span class="pdfsim">${ik('pdf')}</span><div class="orta"><div class="ad">${esc(p.ad)}</div><div class="soluk kucuk sayi">${MB(p.boyut || 0)}${p.s > 1 ? ` · ${p.s}. sayfada kaldın` : ''}</div></div>
+  <button type="button" class="btn kucuk ghost" data-a="pdfAc" data-k="${k.id}" data-id="${p.id}">Aç</button>
+  <button type="button" class="ikon" data-a="pdfSil" data-k="${k.id}" data-id="${p.id}" aria-label="PDF'i sil">${ik('carpi')}</button></li>`).join('')}</ul>`
+  : `<p class="soluk kucuk" style="margin:0">Henüz PDF yok. Slaytları ya da notları ekleyince internet olmadan da açılır.</p>`;
+
+// Okuyucu: pdf.js yalnızca ilk PDF açılışında yüklenir; dosyaları çevrimdışı önbellekte durur.
+const Oku = {
+  async kutuphane() {
+    if (!this.lib) this.lib = import('./vendor/pdfjs/pdf.min.js').then(m => {
+      m.GlobalWorkerOptions.workerSrc = new URL('vendor/pdfjs/pdf.worker.min.js', location.href).href;
+      return m;
+    }).catch(e => { this.lib = null; throw e; });
+    return this.lib;
+  },
+  async ac(konuId, pdfId) {
+    const k = konuBul(konuId), meta = k && (k.pdfler || []).find(p => p.id === pdfId);
+    if (!meta) return;
+    let kayit;
+    try { kayit = await Pdf.al(pdfId); } catch {}
+    if (!kayit) { toast('Bu PDF bu cihazda yok. PDF\'li yedeği yükle ya da dosyayı yeniden ekle.'); return; }
+    const d = $('#oku');
+    d.innerHTML = `<div class="okubas"><button class="ikon" data-a="okuKapat" aria-label="Kapat">${ik('geri')}</button>
+      <div class="orta"><b>${esc(meta.ad)}</b><span class="soluk kucuk sayi" id="okuSayfa">Yükleniyor…</span></div>
+      <button class="ikon" data-a="okuZum" data-n="-1" aria-label="Küçült">${ik('eksi')}</button>
+      <button class="ikon" data-a="okuZum" data-n="1" aria-label="Büyüt">${ik('arti')}</button>
+      <button class="ikon" data-a="okuDis" aria-label="Başka uygulamada aç" title="Başka uygulamada aç">${ik('dis')}</button></div>
+      <div class="okugovde" id="okuGovde"><div class="okuyuk"><span></span></div></div>`;
+    if (!d.open) d.showModal();
+    this.kapat(true);
+    this.k = k; this.meta = meta; this.blob = kayit.blob; this.ad = kayit.ad; this.zum = 1;
+    try {
+      const lib = await this.kutuphane();
+      const veri = new Uint8Array(await kayit.blob.arrayBuffer());
+      this.gorev = lib.getDocument({ data: veri, isEvalSupported: false });
+      this.doc = await this.gorev.promise;
+    } catch (e) {
+      console.warn(e);
+      $('#okuGovde').innerHTML = `<div class="bos"><b>PDF açılamadı</b><span>Dosya bozuk ya da desteklenmiyor olabilir.</span>
+        <button class="btn" data-a="okuDis">Başka uygulamada aç</button></div>`;
+      $('#okuSayfa').textContent = '';
+      return;
+    }
+    await this.diz();
+    const s = Math.min(meta.s || 1, this.doc.numPages);
+    if (s > 1) { const el = $(`#okuGovde [data-s="${s}"]`); if (el) el.scrollIntoView(); }
+  },
+  // Sayfa yer tutucularını gerçek oranlarıyla dizer; çizim görünür olunca yapılır.
+  async diz() {
+    const g = $('#okuGovde'), doc = this.doc;
+    if (!g || !doc) return;
+    const ilk = await doc.getPage(1), v = ilk.getViewport({ scale: 1 }), oran = v.height / v.width;
+    const gen = Math.min(g.clientWidth - 24, 980) * this.zum;
+    g.innerHTML = Array.from({ length: doc.numPages }, (_, i) =>
+      `<div class="sayfa" data-s="${i + 1}" style="width:${gen}px;height:${gen * oran}px"></div>`).join('');
+    g.classList.toggle('genis', this.zum > 1);
+    this.gozcu && this.gozcu.disconnect();
+    this.gozcu = new IntersectionObserver(es => {
+      for (const e of es) if (e.isIntersecting) this.ciz(e.target);
+    }, { root: g, rootMargin: '600px 0px' });
+    for (const el of g.children) this.gozcu.observe(el);
+    g.onscroll = () => this.sayac();
+    this.sayac();
+  },
+  async ciz(el) {
+    if (el.dataset.c === String(this.zum) || !this.doc) return;
+    el.dataset.c = this.zum;
+    const doc = this.doc, p = await doc.getPage(Number(el.dataset.s));
+    if (doc !== this.doc) return;
+    const v1 = p.getViewport({ scale: 1 }), gen = el.clientWidth, dpr = Math.min(devicePixelRatio || 1, 2.5);
+    const vp = p.getViewport({ scale: gen / v1.width * dpr });
+    const cv = document.createElement('canvas');
+    cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+    try { await p.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise; } catch { el.dataset.c = ''; return; }
+    el.replaceChildren(cv);
+  },
+  sayac() {
+    const g = $('#okuGovde'), y = $('#okuSayfa');
+    if (!g || !y || !this.doc) return;
+    const orta = g.scrollTop + g.clientHeight / 3;
+    let s = 1;
+    for (const el of g.children) { if (el.offsetTop <= orta) s = Number(el.dataset.s); else break; }
+    this.s = s;
+    y.textContent = `${s} / ${this.doc.numPages}`;
+  },
+  kapat(sessiz) {
+    if (this.meta && this.s) { this.meta.s = this.s; kaydet(); }
+    this.gozcu && this.gozcu.disconnect();
+    if (this.doc) { this.doc.destroy(); }
+    this.doc = null; this.gorev = null; this.s = 0;
+    if (!sessiz) { this.meta = null; this.blob = null; }
+  }
+};
 
 /* ---------- algoritma köprüsü (asıl mantık algoritma.js içinde) ---------- */
 const tahminDk = k => Algo.tahminDk(S, k);
@@ -416,6 +567,8 @@ function gorDers(d) {
       aria-label="${tamam ? 'Tekrar ettim' : 'Çalıştım'}">${tamam ? ik('tik') : ''}</button>
       <div class="orta"><div class="ad">${esc(k.ad)}</div><div class="kucuk" style="margin-top:2px">${alt}</div></div>
       ${url ? `<a class="ikon" href="${esc(url)}" target="_blank" rel="noopener noreferrer" aria-label="Bağlantıyı aç" title="Bağlantıyı aç">${ik('bag')}</a>` : ''}
+      ${(k.pdfler || []).length ? `<button class="ikon pdfdug" data-a="pdfAc" data-k="${k.id}" ${k.pdfler.length === 1 ? `data-id="${k.pdfler[0].id}"` : ''}
+        aria-label="PDF aç" title="PDF aç">${ik('pdf')}${k.pdfler.length > 1 ? `<small>${k.pdfler.length}</small>` : ''}</button>` : ''}
       <button class="ikon" data-a="konuDuzenle" data-id="${k.id}" aria-label="Konuyu düzenle">${ik('uc', 1)}</button></li>`;
   }).join('')}</ul>`;
   return h + `</div>`;
@@ -468,7 +621,9 @@ function gorSure() {
       `<div class="zaman" id="zaman">${sayacYazi()}</div><small id="zalt">${pm ? pomoAlt(pm) : c.hedef ? `hedef ${c.hedef} dk` : 'serbest çalışma'}</small>`)}
       <div class="konu"><b>${esc(d ? d.ad : 'Silinmiş ders')}</b>${k ? `<div>${esc(k.ad)}</div>` : ''}
       ${k && k.not ? `<div class="knot">${esc(k.not)}</div>` : ''}
-      ${kurl ? `<a class="btn ghost kucuk" style="margin-top:10px" href="${esc(kurl)}" target="_blank" rel="noopener noreferrer">${ik('bag')} Kaynağı aç</a>` : ''}</div>
+      ${kurl || (k && (k.pdfler || []).length) ? `<div class="sira" style="justify-content:center;margin-top:10px">
+        ${(k.pdfler || []).map(p => `<button class="btn ghost kucuk" data-a="pdfAc" data-k="${k.id}" data-id="${p.id}">${ik('pdf')} ${esc(p.ad)}</button>`).join('')}
+        ${kurl ? `<a class="btn ghost kucuk" href="${esc(kurl)}" target="_blank" rel="noopener noreferrer">${ik('bag')} Kaynağı aç</a>` : ''}</div>` : ''}</div>
       <div class="sira" style="justify-content:center"><button class="btn" data-a="sayacDur">${ik('tik')} Bitir ve kaydet</button>
       <button class="btn ghost" data-a="sayacIptal">Vazgeç</button></div>
       <p class="not">Uygulamayı kapatsan da sayaç çalışmaya devam eder.</p></section>`;
@@ -626,7 +781,9 @@ function gorAyarlar() {
   <div class="kart" style="margin-top:0">${bas('indir', 'Yedekleme')}
     <p class="soluk kucuk">Verilerin yalnızca bu cihazda durur. Ara sıra yedek dosyası indirmeni öneririm; başka cihaza taşımak için de aynı dosyayı geri yüklersin.</p>
     <div class="sira" style="margin-top:12px"><button class="btn" data-a="disaAktar">Yedeği indir</button>
+    ${pdfSayisi() ? `<button class="btn ghost" data-a="disaAktar" data-pdf="1">PDF'lerle birlikte indir</button>` : ''}
     <button class="btn ghost" data-a="iceAktar">Geri yükle</button></div>
+    ${pdfSayisi() ? `<p class="soluk kucuk" style="margin-top:12px">Cihazda ${pdfSayisi()} PDF var, toplam ${MB(pdfToplam())}. Normal yedek PDF'leri içermez ve küçük kalır; başka cihaza taşırken PDF'li yedeği kullan.</p>` : ''}
     <input type="file" id="dosya" accept="application/json,.json" hidden></div>
   <div class="kart">${bas('takvim', 'Takvime aktar')}
     <p class="soluk kucuk">Sınavlarını ve önümüzdeki 14 günün programını telefonunun takvimine ekler. İnen dosyayı açman yeterli; yeniden aktarırsan eski kayıtlar güncellenir.</p>
@@ -636,7 +793,7 @@ function gorAyarlar() {
     <p class="soluk kucuk">Android (Chrome): menü › "Ana ekrana ekle" ya da "Uygulamayı yükle". iPhone ve iPad (Safari): Paylaş › "Ana Ekrana Ekle".
     Kurulduktan sonra internet olmadan da açılır.</p></div>
   <div class="kart"><button class="btn tehlike blok" data-a="sifirla">Tüm verileri sil</button></div>
-  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 2.2.1</p></div></div>`;
+  <p class="soluk kucuk" style="text-align:center">Ders Takip · sürüm 2.3</p></div></div>`;
 }
 
 const GORUNUM = { bugun: gorBugun, dersler: gorDersler, sure: gorSure, ozet: gorOzet, ayarlar: gorAyarlar };
@@ -745,7 +902,7 @@ const A = {
     S.sinavlar = S.sinavlar.filter(s => s.komiteId !== id);
     S.komiteler = S.komiteler.filter(k => k.id !== id);
     S.aktifKomite = S.komiteler[0].id;
-    $('#dlg').close(); kaydet(); ciz();
+    $('#dlg').close(); kaydet(); ciz(); Pdf.temizle();
   },
 
   dersEkle() {
@@ -767,7 +924,7 @@ const A = {
     if (!confirm('Bu ders ve tüm konuları silinsin mi? Süre kayıtları kalır.')) return;
     S.konular = S.konular.filter(k => k.dersId !== el.dataset.id);
     S.dersler = S.dersler.filter(d => d.id !== el.dataset.id);
-    UI.dersId = null; $('#dlg').close(); kaydet(); ciz();
+    UI.dersId = null; $('#dlg').close(); kaydet(); ciz(); Pdf.temizle();
   },
   dersAc(el) { UI.dersId = el.dataset.id; UI.filtre = 'tum'; UI.anim = true; ciz(); scrollTo(0, 0); },
   dersKapat() { UI.dersId = null; UI.anim = true; ciz(); },
@@ -789,6 +946,10 @@ const A = {
       <input id="ft" name="tahmin" type="number" inputmode="numeric" min="5" max="600" step="5" value="${k.tahmin || ''}">
       <label for="fn">Not</label><textarea id="fn" name="not" class="kisa" maxlength="600" placeholder="Örn. Slayt 12-30, hocanın vurguladığı yerler">${esc(k.not || '')}</textarea>
       <label for="fb">Bağlantı (slayt, video, kaynak)</label><input id="fb" name="baglanti" type="text" inputmode="url" autocapitalize="off" placeholder="https://" value="${esc(k.baglanti || '')}">
+      <div class="bas" style="margin:16px 0 8px"><label style="margin:0">PDF'ler</label>
+        <button type="button" class="btn kucuk ghost" data-a="pdfEkle" data-id="${k.id}">${ik('arti')} PDF ekle</button></div>
+      <div id="pdfListe">${pdfListe(k)}</div>
+      <input type="file" id="pdfDosya" data-id="${k.id}" accept="application/pdf,.pdf" multiple hidden>
       <div class="sira" style="margin-top:14px">${k.durum === 'calisildi' ? `<button type="button" class="btn ghost kucuk" data-a="konuSifirla" data-id="${k.id}">Çalışılmadı yap</button>` : ''}
       <button type="button" class="btn tehlike kucuk" data-a="konuSil" data-id="${k.id}">Konuyu sil</button></div>`, v => {
       if (!v.ad.trim()) return false;
@@ -801,14 +962,49 @@ const A = {
   },
   konuSifirla(el) {
     const k = konuBul(el.dataset.id), yeni = { id: k.id, dersId: k.dersId, ad: k.ad, durum: 'yeni', tekrarlar: [] };
-    for (const a of ['tahmin', 'not', 'baglanti']) if (k[a]) yeni[a] = k[a];
+    for (const a of ['tahmin', 'not', 'baglanti', 'pdfler']) if (k[a]) yeni[a] = k[a];
     S.konular[S.konular.indexOf(k)] = yeni; // algoritmanın eklediği tüm alanlar da temizlenir
     $('#dlg').close(); kaydet(); ciz();
   },
   konuSil(el) {
     if (!confirm('Bu konu silinsin mi?')) return;
     S.konular = S.konular.filter(k => k.id !== el.dataset.id);
-    $('#dlg').close(); kaydet(); ciz();
+    $('#dlg').close(); kaydet(); ciz(); Pdf.temizle();
+  },
+  pdfEkle() { $('#pdfDosya').click(); },
+  pdfSil(el) {
+    const k = konuBul(el.dataset.k);
+    if (!k || !confirm('Bu PDF cihazdan silinsin mi?')) return;
+    k.pdfler = (k.pdfler || []).filter(p => p.id !== el.dataset.id);
+    if (!k.pdfler.length) delete k.pdfler;
+    kaydet(); Pdf.temizle();
+    const l = $('#pdfListe'); if (l) l.innerHTML = pdfListe(k);
+    if (UI.sekme !== 'dersler' || !$('#dlg').open) ciz();
+  },
+  pdfAc(el) {
+    const k = konuBul(el.dataset.k);
+    if (!k) return;
+    if (el.dataset.id) return Oku.ac(k.id, el.dataset.id);
+    kutu(k.ad, `<div id="pdfListe">${pdfListe(k)}</div>`, null, '', 'Kapat');
+  },
+  okuKapat() { Oku.kapat(); $('#oku').close(); },
+  okuZum(el) {
+    if (!Oku.doc) return;
+    const z = Math.min(3, Math.max(1, Oku.zum + Number(el.dataset.n) * .5));
+    if (z === Oku.zum) return;
+    const g = $('#okuGovde'), oran = g.scrollTop / (g.scrollHeight || 1);
+    Oku.zum = z; Oku.diz().then(() => { g.scrollTop = oran * g.scrollHeight; Oku.sayac(); });
+  },
+  async okuDis() {
+    if (!Oku.blob) return;
+    const ad = /\.pdf$/i.test(Oku.ad || '') ? Oku.ad : (Oku.ad || 'belge') + '.pdf';
+    const f = new File([Oku.blob], ad, { type: 'application/pdf' });
+    try { if (navigator.canShare && navigator.canShare({ files: [f] })) return await navigator.share({ files: [f], title: ad }); }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+    const u = URL.createObjectURL(f), a = document.createElement('a');
+    a.href = u; a.target = '_blank'; a.rel = 'noopener'; a.download = ad;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 60000);
   },
   topluEkle() {
     kutu('Toplu ekle', `<label for="fk">Ders adının sonuna iki nokta koy, altına konularını yaz. Not uygulamasından ya da ders programından yapıştırabilirsin.</label>
@@ -987,13 +1183,22 @@ const A = {
 
   hafta(el) { UI.hafta = Math.min(0, UI.hafta + Number(el.dataset.n)); UI.anim = true; ciz(); },
 
-  disaAktar() {
-    indir(JSON.stringify(S, null, 1), `ders-takip-yedek-${bugun()}.json`, 'application/json');
+  async disaAktar(el) {
+    if (!el || !el.dataset.pdf) return indir(JSON.stringify(S, null, 1), `ders-takip-yedek-${bugun()}.json`, 'application/json');
+    toast('PDF\'li yedek hazırlanıyor…');
+    const pdf = {}, oku = b => new Promise((ok, hata) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = hata; r.readAsDataURL(b); });
+    try {
+      for (const p of S.konular.flatMap(k => k.pdfler || [])) {
+        const x = await Pdf.al(p.id);
+        if (x) pdf[p.id] = { ad: x.ad, veri: await oku(x.blob) };
+      }
+    } catch { return toast('PDF\'ler okunamadı.'); }
+    indir(JSON.stringify({ ...S, _pdf: pdf }), `ders-takip-yedek-pdf-${bugun()}.json`, 'application/json');
   },
   iceAktar() { $('#dosya').click(); },
   sifirla() {
     if (!confirm('Tüm dersler, konular ve kayıtlar kalıcı olarak silinecek. Emin misin?')) return;
-    S = varsayilan(); temaUygula(); kaydet(); ciz(); toast('Tüm veriler silindi.');
+    S = varsayilan(); temaUygula(); kaydet(); ciz(); Pdf.temizle(); toast('Tüm veriler silindi.');
   }
 };
 
@@ -1017,9 +1222,18 @@ document.addEventListener('change', e => {
       const veri = JSON.parse(m);
       if (!veri || !Array.isArray(veri.komiteler)) throw new Error('biçim');
       if (!confirm('Bu cihazdaki mevcut veriler yedekteki verilerle değiştirilecek. Devam edilsin mi?')) return;
-      S = duzelt(veri); temaUygula(); kaydet(); ciz(); toast('Yedek geri yüklendi.');
+      const pdf = veri._pdf && typeof veri._pdf === 'object' ? veri._pdf : null;
+      delete veri._pdf;
+      S = duzelt(veri); temaUygula(); kaydet(); ciz();
+      return pdfGeriYukle(pdf).then(n => { Pdf.temizle(); toast(n ? `Yedek ve ${n} PDF geri yüklendi.` : 'Yedek geri yüklendi.'); });
     }).catch(() => toast('Bu dosya geçerli bir Ders Takip yedeği değil.'));
     el.value = '';
+    return;
+  }
+  if (el.id === 'pdfDosya') {
+    const k = konuBul(el.dataset.id), fs = [...el.files];
+    el.value = '';
+    if (k && fs.length) pdfEkleDosya(k, fs).then(n => { const l = $('#pdfListe'); if (n && l) l.innerHTML = pdfListe(k); });
     return;
   }
   if (!d) return;
@@ -1039,10 +1253,26 @@ document.addEventListener('change', e => {
   kaydet(); toast('Ayar kaydedildi.');
 });
 
+async function pdfGeriYukle(pdf) {
+  if (!pdf) return 0;
+  let n = 0;
+  for (const k of S.konular) for (const p of k.pdfler || []) {
+    const x = pdf[p.id];
+    if (!x || typeof x.veri !== 'string') continue;
+    try {
+      const b = await (await fetch('data:application/pdf;base64,' + x.veri)).blob();
+      await Pdf.koy({ id: p.id, ad: x.ad || p.ad + '.pdf', tur: 'application/pdf', blob: b }); n++;
+    } catch { toast('Bazı PDF\'ler geri yüklenemedi (yer kalmamış olabilir).'); return n; }
+  }
+  return n;
+}
+$('#oku').addEventListener('close', () => Oku.kapat());
+$('#oku').addEventListener('cancel', () => Oku.kapat());
+
 // Gün değişince ya da uygulamaya geri dönünce ekranı tazele.
 let sonGun = bugun();
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden || $('#dlg').open) return;
+  if (document.hidden || $('#dlg').open || $('#oku').open) return;
   if (bugun() !== sonGun) { sonGun = bugun(); ciz(); } else tik();
 });
 

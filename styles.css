@@ -519,3 +519,35 @@ textarea.kisa { min-height: 84px; }
 .bolme.esnek button { flex: 1 1 auto; padding: 0 9px; }
 dialog .ucluk div { background: var(--kart2); }
 dialog .dtablo { grid-template-columns: minmax(0, auto) minmax(40px, 1fr) auto auto; }
+
+/* Sürüm 2.3: konu PDF'leri ve okuyucu */
+.pdfl { margin: 0 0 4px; }
+.pdfl li { padding: 10px 0; gap: 10px; }
+.pdfsim { width: 36px; height: 36px; flex: none; border-radius: 11px; display: grid; place-items: center; color: #e0453a; background: color-mix(in srgb, #e0453a 13%, transparent); }
+.pdfsim .ik { width: 19px; height: 19px; }
+.pdfdug { color: #e0453a; position: relative; }
+.pdfdug small { position: absolute; top: 5px; right: 4px; font-size: .6rem; font-weight: 800; background: #e0453a; color: #fff; border-radius: 99px; min-width: 15px; height: 15px; display: grid; place-items: center; padding: 0 3px; }
+#oku {
+  width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; padding: 0; border: 0; border-radius: 0;
+  background: #1a1f26; color: #fff; overflow: hidden; display: none; flex-direction: column;
+}
+#oku[open] { display: flex; animation: belir .25s cubic-bezier(.2,.8,.2,1); }
+#oku::before { display: none; }
+#oku::backdrop { background: #000; }
+.okubas {
+  display: flex; align-items: center; gap: 2px; padding: calc(6px + env(safe-area-inset-top)) 8px 6px; flex: none;
+  background: rgba(16,20,26,.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.okubas .orta { flex: 1; min-width: 0; display: grid; padding: 0 6px; line-height: 1.25; }
+.okubas b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .95rem; }
+.okubas .soluk { color: rgba(255,255,255,.6); }
+.okubas .ikon { color: #fff; }
+.okugovde { flex: 1; overflow: auto; padding: 12px 12px calc(24px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.okugovde .sayfa { margin: 0 auto 12px; background: #fff; border-radius: 4px; box-shadow: 0 6px 20px -8px rgba(0,0,0,.6); overflow: hidden; }
+.okugovde.genis .sayfa { margin-left: 0; }
+.okugovde canvas { display: block; width: 100%; height: 100%; }
+.okugovde .bos { color: rgba(255,255,255,.75); margin-top: 18vh; }
+.okugovde .bos b { color: #fff; }
+.okuyuk { display: grid; place-items: center; height: 60vh; }
+.okuyuk span { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(255,255,255,.15); border-top-color: #2dd4bf; animation: don .8s linear infinite; }
+@keyframes don { to { transform: rotate(360deg); } }
